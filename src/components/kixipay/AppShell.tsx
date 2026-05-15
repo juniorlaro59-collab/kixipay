@@ -331,7 +331,7 @@ function ContribuicoesChart() {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: (c: { parsed: { y: number } }) => fmtKz(c.parsed.y) } },
+          tooltip: { callbacks: { label: (c) => fmtKz(Number(c.parsed.y ?? 0)) } },
         },
         scales: {
           y: { ticks: { callback: (v) => `${(+v / 1000)}k` }, grid: { color: 'rgba(0,0,0,0.05)' } },
