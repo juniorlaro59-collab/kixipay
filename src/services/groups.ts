@@ -95,6 +95,31 @@ export async function updateGrupo(data: Partial<Grupo>): Promise<Grupo> {
   return put<Grupo>("/grupo", data);
 }
 
+export interface ContribuicaoInput {
+  membroId: number;
+  valor: number;
+  data: string;
+  metodo: "App" | "USSD" | "Dinheiro presencial";
+  notas?: string;
+}
+
+export async function registrarContribuicao(data: ContribuicaoInput): Promise<Transacao> {
+  if (IS_MOCK) {
+    await delay(600);
+    const membro = MEMBROS.find((m) => m.id === data.membroId);
+    return {
+      id: HISTORICO.length + 1,
+      data: data.data,
+      membro: membro?.nome || "Desconhecido",
+      tipo: "Contribuição",
+      valor: data.valor,
+      ref: `KXP-${data.data.replace(/\//g, "").slice(0, 4)}-${String(HISTORICO.length + 1).padStart(3, "0")}`,
+      status: "Pago",
+    };
+  }
+  return post<Transacao>("/contribuicoes", data);
+}
+
 export async function addMembro(data: {
   nome: string;
   telefone: string;

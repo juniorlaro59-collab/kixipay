@@ -1,8 +1,16 @@
 export { login, register, getUserDisplayName, getUserRole } from "./auth";
 export type { LoginResult } from "./auth";
 
-export { getGrupo, getDashboard, getMembros, getHistorico, updateGrupo, addMembro } from "./groups";
-export type { DashboardData } from "./groups";
+export {
+  getGrupo,
+  getDashboard,
+  getMembros,
+  getHistorico,
+  updateGrupo,
+  addMembro,
+  registrarContribuicao,
+} from "./groups";
+export type { DashboardData, ContribuicaoInput } from "./groups";
 
 export {
   getComunidades,

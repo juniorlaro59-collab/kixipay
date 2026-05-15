@@ -28,7 +28,7 @@ import type {
   ContribuicaoFormData,
   AddMembroFormData,
 } from "@/lib/validations";
-import { login } from "@/services";
+import { login, registrarContribuicao, addMembro } from "@/services";
 
 export function AuthModal({
   open,
@@ -476,18 +476,59 @@ export function ContribuicaoModal({
   onConfirm: (msg: string) => void;
   prefill?: Membro | null;
 }) {
-  const [memId, setMemId] = useState<number>(prefill?.id ?? MEMBROS[0].id);
-  const mem = MEMBROS.find((m) => m.id === memId)!;
+  const [loading, setLoading] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setError,
+  } = useForm<ContribuicaoFormData>({
+    resolver: zodResolver(contribuicaoSchema),
+    defaultValues: {
+      membroId: prefill?.id ?? MEMBROS[0].id,
+      valor: 5000,
+      data: "2026-05-15",
+      metodo: "App",
+    },
+  });
+  const onSubmit = async (data: ContribuicaoFormData) => {
+    setLoading(true);
+    try {
+      await registrarContribuicao(data);
+      onConfirm(`Pagamento de ${fmtKz(data.valor)} registado com sucesso ✓`);
+    } catch {
+      setError("root", { message: "Erro ao registar contribuição. Tente novamente." });
+    } finally {
+      setLoading(false);
+    }
+  };
+  const RootError = ({ message }: { message?: string }) =>
+    message ? (
+      <div
+        style={{
+          padding: "10px 14px",
+          background: "var(--red-light)",
+          color: "var(--red)",
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 500,
+          textAlign: "center",
+          marginBottom: 16,
+        }}
+      >
+        {message}
+      </div>
+    ) : null;
   return (
     <Modal open={open} onClose={onClose}>
-      <div style={{ padding: 32 }}>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ padding: 32 }}>
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 20 }}>
           Registar Contribuição
         </h2>
+        <RootError message={errors.root?.message} />
         <label style={{ fontSize: 13, fontWeight: 600 }}>Membro</label>
         <select
-          value={memId}
-          onChange={(e) => setMemId(+e.target.value)}
+          {...register("membroId", { valueAsNumber: true })}
           className="kx-input"
           style={{ marginTop: 6, marginBottom: 14 }}
         >
@@ -499,42 +540,68 @@ export function ContribuicaoModal({
         </select>
         <label style={{ fontSize: 13, fontWeight: 600 }}>Valor (Kz)</label>
         <input
+          {...register("valor", { valueAsNumber: true })}
           className="kx-input"
-          defaultValue="5000"
           style={{ marginTop: 6, marginBottom: 14 }}
         />
+        {errors.valor && (
+          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
+            {errors.valor.message}
+          </span>
+        )}
         <label style={{ fontSize: 13, fontWeight: 600 }}>Data</label>
         <input
-          className="kx-input"
+          {...register("data")}
           type="date"
-          defaultValue="2026-05-15"
+          className="kx-input"
           style={{ marginTop: 6, marginBottom: 14 }}
         />
+        {errors.data && (
+          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
+            {errors.data.message}
+          </span>
+        )}
         <label style={{ fontSize: 13, fontWeight: 600 }}>Método</label>
-        <select className="kx-input" style={{ marginTop: 6, marginBottom: 14 }}>
-          <option>App</option>
-          <option>USSD</option>
-          <option>Dinheiro presencial</option>
+        <select
+          {...register("metodo")}
+          className="kx-input"
+          style={{ marginTop: 6, marginBottom: 14 }}
+        >
+          <option value="App">App</option>
+          <option value="USSD">USSD</option>
+          <option value="Dinheiro presencial">Dinheiro presencial</option>
         </select>
+        {errors.metodo && (
+          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
+            {errors.metodo.message}
+          </span>
+        )}
         <label style={{ fontSize: 13, fontWeight: 600 }}>Notas (opcional)</label>
         <textarea
+          {...register("notas")}
           className="kx-input"
           rows={2}
           style={{ marginTop: 6, marginBottom: 20, resize: "vertical" }}
         />
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} className="kx-btn kx-btn-outline" style={{ flex: 1 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="kx-btn kx-btn-outline"
+            style={{ flex: 1 }}
+          >
             Cancelar
           </button>
           <button
-            onClick={() => onConfirm(`Pagamento de ${mem.nome} confirmado ✓ +5.000 Kz`)}
+            type="submit"
+            disabled={loading}
             className="kx-btn kx-btn-primary"
             style={{ flex: 1 }}
           >
-            Confirmar pagamento
+            {loading ? "A registar..." : "Confirmar pagamento"}
           </button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }
@@ -548,33 +615,109 @@ export function AddMembroModal({
   onClose: () => void;
   onConfirm: (msg: string) => void;
 }) {
+  const [loading, setLoading] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setError,
+  } = useForm<AddMembroFormData>({
+    resolver: zodResolver(addMembroSchema),
+    defaultValues: { nome: "", telefone: "", email: "", posicao: 1 },
+  });
+  const onSubmit = async (data: AddMembroFormData) => {
+    setLoading(true);
+    try {
+      await addMembro(data);
+      onConfirm(`${data.nome} adicionado ao grupo ✓ Convite enviado por SMS`);
+    } catch {
+      setError("root", { message: "Erro ao adicionar membro. Tente novamente." });
+    } finally {
+      setLoading(false);
+    }
+  };
+  const RootError = ({ message }: { message?: string }) =>
+    message ? (
+      <div
+        style={{
+          padding: "10px 14px",
+          background: "var(--red-light)",
+          color: "var(--red)",
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 500,
+          textAlign: "center",
+          marginBottom: 16,
+        }}
+      >
+        {message}
+      </div>
+    ) : null;
   return (
     <Modal open={open} onClose={onClose}>
-      <div style={{ padding: 32 }}>
+      <form onSubmit={handleSubmit(onSubmit)} style={{ padding: 32 }}>
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 20 }}>
           Adicionar membro ao grupo
         </h2>
-        <input className="kx-input" placeholder="Nome completo" style={{ marginBottom: 12 }} />
-        <input className="kx-input" placeholder="+244 9XX XXX XXX" style={{ marginBottom: 12 }} />
-        <input className="kx-input" placeholder="Email (opcional)" style={{ marginBottom: 12 }} />
-        <select className="kx-input" style={{ marginBottom: 20 }}>
+        <RootError message={errors.root?.message} />
+        <input
+          {...register("nome")}
+          className="kx-input"
+          placeholder="Nome completo"
+          style={{ marginBottom: 12 }}
+        />
+        {errors.nome && (
+          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
+            {errors.nome.message}
+          </span>
+        )}
+        <input
+          {...register("telefone")}
+          className="kx-input"
+          placeholder="+244 9XX XXX XXX"
+          style={{ marginBottom: 12 }}
+        />
+        {errors.telefone && (
+          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
+            {errors.telefone.message}
+          </span>
+        )}
+        <input
+          {...register("email")}
+          className="kx-input"
+          placeholder="Email (opcional)"
+          style={{ marginBottom: 12 }}
+        />
+        <select
+          {...register("posicao", { valueAsNumber: true })}
+          className="kx-input"
+          style={{ marginBottom: 20 }}
+        >
           {Array.from({ length: 12 }, (_, i) => (
-            <option key={i}>Posição {i + 1}</option>
+            <option key={i + 1} value={i + 1}>
+              Posição {i + 1}
+            </option>
           ))}
         </select>
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} className="kx-btn kx-btn-outline" style={{ flex: 1 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="kx-btn kx-btn-outline"
+            style={{ flex: 1 }}
+          >
             Cancelar
           </button>
           <button
-            onClick={() => onConfirm("Novo membro adicionado ✓ SMS de boas-vindas enviado")}
+            type="submit"
+            disabled={loading}
             className="kx-btn kx-btn-primary"
             style={{ flex: 1 }}
           >
-            Adicionar ao grupo
+            {loading ? "A adicionar..." : "Adicionar ao grupo"}
           </button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }
