@@ -1,4 +1,4 @@
-export { login, register, getUserDisplayName, getUserRole } from "./auth";
+export { login, register, getUserDisplayName, getUserRole, getAllMockUsers } from "./auth";
 export type { LoginResult } from "./auth";
 
 export {
@@ -29,10 +29,47 @@ export {
   fmtKz,
 } from "./score";
 
+export {
+  getPlatformStats,
+  getActivityLog,
+  getAgentes,
+  updateAgenteStatus,
+  getAllMembrosAdmin,
+  removeMembroAdmin,
+} from "./admin";
+export {
+  getAgentDashboard,
+  cadastrarMembro,
+  getActividadesAgente,
+  getComunidadesByRegiao,
+  getScoreRecomendacao,
+} from "./agents";
+
+export {
+  getADashboard,
+  getPredicoes,
+  getPredicaoByMembro,
+  getAlertas,
+  marcarAlertaLido,
+  analisarMembro,
+  getMembrosRisco,
+} from "./ai-score";
+
 export { setToken, clearToken, IS_MOCK } from "./client";
 
 // Re-export mock data for direct use in components (legacy)
-export { MEMBROS, HISTORICO, COMUNIDADES, REGIOES, NOTIFICACOES, GRUPO_MOCK } from "./mock-data";
+export {
+  MEMBROS,
+  HISTORICO,
+  COMUNIDADES,
+  REGIOES,
+  NOTIFICACOES,
+  GRUPO_MOCK,
+  AGENTES,
+  ACTIVITY_LOG,
+  SCORE_PREDICOES,
+  SCORE_ALERTAS,
+} from "./mock-data";
 export type {
   Membro,
   Transacao,
@@ -45,4 +82,14 @@ export type {
   Elegibilidade,
   LoginRequest,
   RegisterRequest,
+  Agente,
+  ActivityLogEntry,
+  PlatformStats,
+  ScorePredictao,
+  ScoreAlert,
+  AScoreDashboard,
+  ScoreFactor,
+  AgentDashboardData,
+  ActividadeAgente,
+  CadastroPayload,
 } from "@/types";

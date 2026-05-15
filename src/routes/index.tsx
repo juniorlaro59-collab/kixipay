@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Landing } from "@/components/kixipay/Landing";
 import { AppShell, MemberDrawer } from "@/components/kixipay/AppShell";
+import { AdminPanel } from "@/components/admin/AdminPanel";
+import AgentPanel from "@/components/agent/AgentPanel";
 import {
   AuthModal,
   ContribuicaoModal,
@@ -10,7 +12,9 @@ import {
   RecomendacaoModal,
 } from "@/components/kixipay/Modals";
 import { ToastContainer, type Toast } from "@/components/kixipay/shared";
-import type { Membro } from "@/components/kixipay/data";
+import type { Membro, UserId, Role as UserRole } from "@/components/kixipay/data";
+import { setAuthUser, persistAuth, restoreAuth, logout as authLogout } from "@/lib/auth-store";
+import type { LoginResult } from "@/services";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -41,12 +45,19 @@ type ModalKind =
   | "recomendacao"
   | null;
 
+type AppUser = { userId: UserId; nome: string; role: UserRole } | null;
+
 function KixiPayApp() {
-  const [user, setUser] = useState<"conceicao" | "manuel" | null>(null);
+  const [user, setUser] = useState<AppUser>(null);
   const [modal, setModal] = useState<ModalKind>(null);
   const [drawerMem, setDrawerMem] = useState<Membro | null>(null);
   const [modalMem, setModalMem] = useState<Membro | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  useEffect(() => {
+    const saved = restoreAuth();
+    if (saved) setUser({ userId: saved.userId, nome: saved.nome, role: saved.role });
+  }, []);
 
   const pushToast = useCallback((tipo: Toast["tipo"], mensagem: string) => {
     setToasts((t) => [...t.slice(-2), { id: Date.now() + Math.random(), tipo, mensagem }]);
@@ -62,32 +73,92 @@ function KixiPayApp() {
     setModal(m);
   }, []);
 
-  const handleLogin = (who: "conceicao" | "manuel") => {
-    setUser(who);
+  const handleLogin = (who: UserId) => {
+    const nome =
+      who === "conceicao"
+        ? "Conceição Mateus"
+        : who === "manuel"
+          ? "Manuel Jacinto"
+          : who === "admin"
+            ? "Administrador"
+            : who === "agente1"
+              ? "Maria Agostinho"
+              : "Pedro Kussumua";
+    const role: UserRole =
+      who === "admin"
+        ? "admin"
+        : who === "agente1" || who === "agente2"
+          ? "agent"
+          : who === "conceicao"
+            ? "coordinator"
+            : "member";
+    const authUser = { userId: who, nome, role, token: `kx_mock_${who}_${Date.now()}` };
+    setUser({ userId: who, nome, role });
+    setAuthUser(authUser);
+    persistAuth();
     setModal(null);
-    pushToast(
-      "sucesso",
-      who === "conceicao" ? "Bem-vinda, Conceição! 👋" : "Bem-vindo, Manuel! 👋",
-    );
+    const msg =
+      role === "admin"
+        ? "Bem-vindo ao painel administrativo 👋"
+        : role === "agent"
+          ? `Bem-vindo, ${nome}! 👋`
+          : who === "conceicao"
+            ? "Bem-vinda, Conceição! 👋"
+            : "Bem-vindo, Manuel! 👋";
+    pushToast("sucesso", msg);
   };
+
+  const handleLogout = () => {
+    setUser(null);
+    setAuthUser(null);
+    authLogout();
+    pushToast("info", "Sessão terminada");
+  };
+
+  if (!user) {
+    return (
+      <>
+        <Landing onAuth={() => setModal("auth")} />
+        <AuthModal open={modal === "auth"} onClose={() => setModal(null)} onLogin={handleLogin} />
+        <ToastContainer toasts={toasts} onClose={closeToast} />
+      </>
+    );
+  }
+
+  if (user.role === "admin") {
+    return (
+      <>
+        <AdminPanel onLogout={handleLogout} toast={pushToast} />
+        <ToastContainer toasts={toasts} onClose={closeToast} />
+      </>
+    );
+  }
+
+  if (user.role === "agent") {
+    const agentId = user.userId === "agente1" ? 1 : user.userId === "agente2" ? 2 : 1;
+    return (
+      <>
+        <AgentPanel
+          agentId={agentId}
+          agentNome={user.nome}
+          onLogout={handleLogout}
+          toast={(tipo, msg) => pushToast(tipo, msg)}
+        />
+        <ToastContainer toasts={toasts} onClose={closeToast} />
+      </>
+    );
+  }
 
   return (
     <>
-      {!user ? (
-        <Landing onAuth={() => setModal("auth")} />
-      ) : (
-        <AppShell
-          user={user}
-          role={user === "conceicao" ? "coordinator" : "member"}
-          onLogout={() => {
-            setUser(null);
-            pushToast("info", "Sessão terminada");
-          }}
-          openModal={openModal}
-          openDrawer={setDrawerMem}
-          toast={pushToast}
-        />
-      )}
+      <AppShell
+        user={user.userId as "conceicao" | "manuel"}
+        role={user.role as "coordinator" | "member"}
+        onLogout={handleLogout}
+        openModal={openModal}
+        openDrawer={setDrawerMem}
+        toast={pushToast}
+      />
 
       <AuthModal open={modal === "auth"} onClose={() => setModal(null)} onLogin={handleLogin} />
       <ContribuicaoModal

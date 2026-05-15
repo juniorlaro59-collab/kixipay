@@ -1,7 +1,7 @@
 // ─── Domain Types ───────────────────────────────────────────────────────
 
-export type UserRole = "coordinator" | "member";
-export type UserId = "conceicao" | "manuel";
+export type UserRole = "admin" | "agent" | "coordinator" | "member";
+export type UserId = "admin" | "agente1" | "agente2" | "conceicao" | "manuel";
 
 export type MemberStatus = "Pago" | "Pendente" | "Em atraso";
 export type TxStatus = "Pago" | "Pendente" | "Em atraso" | "Recebido" | "Enviado" | "Recuperado";
@@ -141,4 +141,121 @@ export interface PeriodoFilter {
 export interface MembroFilter {
   search?: string;
   status?: MemberStatus | "todos";
+}
+
+// ─── Admin Types ─────────────────────────────────────────────────────────
+
+export interface PlatformStats {
+  totalMembros: number;
+  totalGrupos: number;
+  totalAgentes: number;
+  totalCoordenadores: number;
+  volumeTotal: number;
+  scoreMedio: number;
+  membrosActivos: number;
+  fundosCirculacao: number;
+  crescimentoMensal: number;
+}
+
+export interface ActivityLogEntry {
+  id: number;
+  tipo: "criacao" | "actualizacao" | "remocao" | "alerta" | "login" | "registo";
+  entidade: "membro" | "agente" | "coordenador" | "grupo" | "sistema";
+  entidadeId: string | number;
+  descricao: string;
+  responsavel: string;
+  data: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface Agente {
+  id: number;
+  nome: string;
+  telefone: string;
+  email: string;
+  regiao: string;
+  status: "activo" | "inactivo" | "suspenso";
+  membrosCadastrados: number;
+  scoreMedioAgente: number;
+  taxaRetencao: number;
+  metaMensal: number;
+  atingidoEsteMes: number;
+  dataContratacao: string;
+  iniciais: string;
+  cor: string;
+  gruposAssociados: string[];
+}
+
+// ─── AI Score Types ──────────────────────────────────────────────────────
+
+export interface ScorePredictao {
+  membroId: number;
+  membroNome: string;
+  scoreActual: number;
+  scoreProjectado: number;
+  tendencia: "subindo" | "estavel" | "descendo";
+  confianca: number;
+  factores: ScoreFactor[];
+  recomendacao: string;
+  dataAnalise: string;
+}
+
+export interface ScoreFactor {
+  factor: string;
+  impacto: "positivo" | "negativo" | "neutro";
+  peso: number;
+  descricao: string;
+}
+
+export interface ScoreAlert {
+  id: number;
+  membroId: number;
+  membroNome: string;
+  score: number;
+  tipo: "critico" | "atencao" | "melhoria";
+  mensagem: string;
+  data: string;
+  lido: boolean;
+  accaoRecomendada: string;
+}
+
+export interface AScoreDashboard {
+  scoreMedioGeral: number;
+  totalAnalises: number;
+  alertasActivos: number;
+  membrosEmRisco: number;
+  distribuicao: { nivel: string; count: number }[];
+  tendencias: { mes: string; scoreMedio: number }[];
+}
+
+// ─── Agent Types ─────────────────────────────────────────────────────────
+
+export interface AgentDashboardData {
+  membrosCadastradosMes: number;
+  metaMensal: number;
+  progressoMeta: number;
+  taxaRetencao: number;
+  scoreMedioCarteira: number;
+  ultimosCadastros: Membro[];
+  notificacoes: Notificacao[];
+  actividadesRecentes: ActividadeAgente[];
+  gruposNaRegiao: number;
+}
+
+export interface ActividadeAgente {
+  id: number;
+  tipo: "cadastro" | "visita" | "lembrete" | "resolucao";
+  descricao: string;
+  membroEnvolvido?: string;
+  data: string;
+  resultado?: string;
+}
+
+export interface CadastroPayload {
+  nome: string;
+  telefone: string;
+  regiao: string;
+  grupoCodigo?: string;
+  coordenadorNome?: string;
+  observacoes?: string;
 }

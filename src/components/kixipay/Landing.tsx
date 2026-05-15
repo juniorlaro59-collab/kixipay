@@ -1583,7 +1583,328 @@ export function Landing({ onAuth }: { onAuth: () => void }) {
       <PlanosLanding onAuth={onAuth} />
       <Testemunhos />
       <ParaBancos onAuth={onAuth} />
+      <AILanding />
+      <AgentesLanding onAuth={onAuth} />
+      <AdminLanding />
       <Footer />
     </div>
+  );
+}
+
+function AILanding() {
+  return (
+    <section
+      style={{
+        padding: "100px 24px",
+        background: "linear-gradient(180deg, var(--card) 0%, var(--surface) 100%)",
+      }}
+    >
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 56 }}>
+          <span
+            style={{
+              background: "var(--brand-light)",
+              color: "var(--brand-dark)",
+              padding: "4px 14px",
+              borderRadius: 100,
+              fontSize: 12,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: 1,
+            }}
+          >
+            🤖 Inteligência Artificial
+          </span>
+          <h2 className="kx-display" style={{ fontSize: 40, marginTop: 20, marginBottom: 16 }}>
+            Análise de Score com IA
+          </h2>
+          <p
+            style={{
+              color: "var(--ink-3)",
+              fontSize: 16,
+              maxWidth: 600,
+              margin: "0 auto",
+              lineHeight: 1.6,
+            }}
+          >
+            O nosso modelo de IA analisa padrões de pagamento, pontualidade e comportamento para
+            prever tendências de score e identificar membros em risco antes que seja tarde.
+          </p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
+          {[
+            {
+              icon: "📊",
+              title: "Predição de Score",
+              desc: "Algoritmos preditivos calculam a evolução do score de cada membro com 85%+ de precisão, identificando tendências de subida ou descida.",
+            },
+            {
+              icon: "🚨",
+              title: "Alertas Inteligentes",
+              desc: "Alertas automáticos quando um membro apresenta risco de incumprimento. O sistema recomenda acções como contacto do agente ou lembretes SMS.",
+            },
+            {
+              icon: "📋",
+              title: "Factores de Impacto",
+              desc: "Cada score é decomposto nos factores que mais influenciam: pontualidade, tempo de conta, volume poupado e regularidade de contribuições.",
+            },
+          ].map((c) => (
+            <div
+              key={c.title}
+              className="kx-card kx-card-hover"
+              style={{ padding: 28, borderRadius: 20 }}
+            >
+              <div style={{ fontSize: 36, marginBottom: 16 }}>{c.icon}</div>
+              <h3
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  marginBottom: 8,
+                }}
+              >
+                {c.title}
+              </h3>
+              <p style={{ color: "var(--ink-2)", fontSize: 14, lineHeight: 1.6 }}>{c.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AgentesLanding({ onAuth }: { onAuth: () => void }) {
+  return (
+    <section style={{ padding: "100px 24px", background: "var(--card)" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}
+        >
+          <div>
+            <span
+              style={{
+                background: "var(--green-light)",
+                color: "var(--green)",
+                padding: "4px 14px",
+                borderRadius: 100,
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
+            >
+              👥 Rede de Agentes
+            </span>
+            <h2 className="kx-display" style={{ fontSize: 36, marginTop: 20, marginBottom: 16 }}>
+              Agentes de Campo em Todo o País
+            </h2>
+            <p style={{ color: "var(--ink-3)", fontSize: 15, lineHeight: 1.7, marginBottom: 24 }}>
+              A nossa rede de agentes leva o KixiPay a todos os cantos de Angola. Os agentes
+              cadastram novos membros, monitorizam a participação nos grupos e garantem que cada
+              kixikila funciona sem problemas.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 28 }}>
+              {[
+                { icon: "📝", label: "Cadastro presencial de membros sem smartphone" },
+                { icon: "📱", label: "Suporte USSD para comunidades rurais" },
+                { icon: "📈", label: "Monitorização de score e pontualidade" },
+                { icon: "🎯", label: "Metas mensais e comissões por cadastro" },
+              ].map((f) => (
+                <div
+                  key={f.label}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    fontSize: 14,
+                    color: "var(--ink-2)",
+                  }}
+                >
+                  <span style={{ fontSize: 20 }}>{f.icon}</span>
+                  {f.label}
+                </div>
+              ))}
+            </div>
+            <button onClick={onAuth} className="kx-btn kx-btn-primary kx-btn-lg">
+              Quero ser agente KixiPay
+            </button>
+          </div>
+          <div
+            style={{
+              background: "var(--surface)",
+              borderRadius: 24,
+              padding: 32,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--ink-3)",
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
+            >
+              Agentes em Destaque
+            </div>
+            {[
+              {
+                nome: "Maria Agostinho",
+                regiao: "Luanda",
+                cadastros: 47,
+                score: 742,
+                cor: "#8B5CF6",
+              },
+              {
+                nome: "Pedro Kussumua",
+                regiao: "Benguela",
+                cadastros: 32,
+                score: 689,
+                cor: "#EC4899",
+              },
+              {
+                nome: "Helena Muxito",
+                regiao: "Huambo",
+                cadastros: 18,
+                score: 651,
+                cor: "#06B6D4",
+              },
+            ].map((a) => (
+              <div
+                key={a.nome}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  padding: "12px 0",
+                  borderBottom: "1px solid var(--border)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    background: a.cor,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    flexShrink: 0,
+                  }}
+                >
+                  {a.nome
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{a.nome}</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                    {a.regiao} · {a.cadastros} cadastros
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-num)",
+                      fontWeight: 700,
+                      fontSize: 16,
+                      color: a.score >= 700 ? "var(--green)" : "var(--orange-mid)",
+                    }}
+                  >
+                    {a.score}
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--ink-4)" }}>score médio</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AdminLanding() {
+  return (
+    <section
+      style={{
+        padding: "100px 24px",
+        background: "linear-gradient(180deg, var(--surface) 0%, #1a1a2e 100%)",
+      }}
+    >
+      <div style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
+        <span
+          style={{
+            background: "rgba(139,92,246,0.15)",
+            color: "#8B5CF6",
+            padding: "4px 14px",
+            borderRadius: 100,
+            fontSize: 12,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: 1,
+          }}
+        >
+          ⚙️ Gestão Centralizada
+        </span>
+        <h2
+          className="kx-display"
+          style={{ fontSize: 36, marginTop: 20, marginBottom: 12, color: "#fff" }}
+        >
+          Painel de Administração
+        </h2>
+        <p
+          style={{
+            color: "#999",
+            fontSize: 15,
+            maxWidth: 600,
+            margin: "0 auto 48px",
+            lineHeight: 1.6,
+          }}
+        >
+          Controla todos os aspectos da plataforma: membros, agentes, coordenadores, grupos e
+          análise de score — tudo num painel centralizado.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+          {[
+            {
+              icon: "👥",
+              label: "Gestão de Membros",
+              desc: "Cadastro, remoção e histórico completo",
+            },
+            { icon: "🕵️", label: "Controlo de Agentes", desc: "Metas, desempenho e regiões" },
+            { icon: "🤖", label: "Análise IA", desc: "Predições, alertas e score" },
+            { icon: "📊", label: "Relatórios", desc: "Estatísticas e crescimento da plataforma" },
+          ].map((f) => (
+            <div
+              key={f.label}
+              className="kx-card kx-card-hover"
+              style={{ padding: 24, borderRadius: 16, background: "var(--card)" }}
+            >
+              <div style={{ fontSize: 32, marginBottom: 12 }}>{f.icon}</div>
+              <h3
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  marginBottom: 6,
+                }}
+              >
+                {f.label}
+              </h3>
+              <p style={{ color: "var(--ink-3)", fontSize: 13, lineHeight: 1.5 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

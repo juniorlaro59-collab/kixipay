@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Modal, Avatar, GeoQR, Logo } from "./shared";
 import { MEMBROS, fmtKz, eligivel, scoreLabel } from "./data";
-import type { Membro } from "./data";
+import type { Membro, UserId } from "./data";
 import {
   Check,
   Copy,
@@ -37,7 +37,7 @@ export function AuthModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onLogin: (user: "conceicao" | "manuel") => void;
+  onLogin: (user: UserId) => void;
 }) {
   const [tab, setTab] = useState<"entrar" | "criar">("entrar");
   const [loading, setLoading] = useState(false);
@@ -82,13 +82,20 @@ export function AuthModal({
     }
   };
 
-  const fakeLogin = async (who: "conceicao" | "manuel") => {
+  const fakeLogin = async (who: UserId) => {
     setLoading(true);
     setLoadingMsg("A entrar como demo...");
     try {
+      const phones: Record<UserId, string> = {
+        conceicao: "923456789",
+        manuel: "912345678",
+        admin: "900000001",
+        agente1: "900000002",
+        agente2: "900000003",
+      };
       const result = await login({
-        telefone: who === "manuel" ? "912345678" : "923456789",
-        pin: "1234",
+        telefone: phones[who] || "923456789",
+        pin: "0000",
       });
       onLogin(result.userId);
     } finally {
@@ -338,6 +345,48 @@ export function AuthModal({
               </span>
               <ArrowRight size={16} />
             </button>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => fakeLogin("admin")}
+                className="kx-btn"
+                style={{
+                  flex: 1,
+                  background: "rgba(139,92,246,0.12)",
+                  color: "#8B5CF6",
+                  fontWeight: 600,
+                  height: 44,
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  fontSize: 13,
+                }}
+              >
+                <Shield size={16} /> Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => fakeLogin("agente1")}
+                className="kx-btn"
+                style={{
+                  flex: 1,
+                  background: "rgba(6,182,212,0.12)",
+                  color: "#06B6D4",
+                  fontWeight: 600,
+                  height: 44,
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  fontSize: 13,
+                }}
+              >
+                <User size={16} /> Agente
+              </button>
+            </div>
           </form>
         ) : (
           <form

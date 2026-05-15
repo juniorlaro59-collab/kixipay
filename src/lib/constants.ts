@@ -26,7 +26,45 @@ export const REGIOES_ANGOLA = [
   "Kwanza Norte",
   "Bié",
   "Moxico",
+  "Zaire",
+  "Uíge",
+  "Lunda Norte",
+  "Lunda Sul",
+  "Cuando Cubango",
+  "Namibe",
+  "Cunene",
 ] as const;
+
+export const AGENT_META_PADRAO = 20;
+export const AGENT_COMISSAO_POR_CADASTRO = 500;
+export const SCORE_ALERTA_CRITICO = 400;
+export const SCORE_ALERTA_ATENCAO = 600;
+
+export const ADMIN_EMAIL = "admin@kixipay.ao";
+
+export const MOCK_USERS_ADMIN = [
+  {
+    id: "admin" as const,
+    nome: "Administrador KixiPay",
+    role: "admin" as const,
+    telefone: "900000001",
+    pin: "0000",
+  },
+  {
+    id: "agente1" as const,
+    nome: "Maria Agostinho",
+    role: "agent" as const,
+    telefone: "900000002",
+    pin: "0000",
+  },
+  {
+    id: "agente2" as const,
+    nome: "Pedro Kussumua",
+    role: "agent" as const,
+    telefone: "900000003",
+    pin: "0000",
+  },
+];
 
 export const ROTACAO_MESES = [
   "Dez 2025",
