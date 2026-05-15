@@ -1,8 +1,34 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Modal, Avatar, GeoQR, Logo } from "./shared";
 import { MEMBROS, fmtKz, eligivel, scoreLabel } from "./data";
 import type { Membro } from "./data";
-import { Check, Copy, User, Smartphone, LogIn, UserPlus, Shield, ArrowRight } from "lucide-react";
+import {
+  Check,
+  Copy,
+  User,
+  Smartphone,
+  LogIn,
+  UserPlus,
+  Shield,
+  ArrowRight,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import {
+  loginSchema,
+  registerSchema,
+  contribuicaoSchema,
+  addMembroSchema,
+} from "@/lib/validations";
+import type {
+  LoginFormData,
+  RegisterFormData,
+  ContribuicaoFormData,
+  AddMembroFormData,
+} from "@/lib/validations";
+import { login } from "@/services";
 
 export function AuthModal({
   open,
@@ -14,92 +40,109 @@ export function AuthModal({
   onLogin: (user: "conceicao" | "manuel") => void;
 }) {
   const [tab, setTab] = useState<"entrar" | "criar">("entrar");
-  const [phone, setPhone] = useState("");
-  const [nome, setNome] = useState("");
-  const [pin, setPin] = useState(["", "", "", ""]);
-  const [pinReg, setPinReg] = useState(["", "", "", ""]);
   const [loading, setLoading] = useState(false);
-  const [termos, setTermos] = useState(true);
+  const [showPin, setShowPin] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
 
-  const pinId = (i: number) => `auth-pin-${i}`;
-  const setPinAt = (arr: string[], set: (v: string[]) => void, i: number, v: string) => {
-    const next = [...arr];
-    next[i] = v.slice(-1);
-    set(next);
-    if (v && i < 3) document.getElementById(pinId(i + 1))?.focus();
-  };
-  const handlePinKey = (arr: string[], i: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !arr[i] && i > 0) document.getElementById(pinId(i - 1))?.focus();
-  };
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { telefone: "", pin: "" },
+  });
 
-  const determineUser = () => {
-    const p = phone.replace(/\s/g, "");
-    if (p.includes("912345678") || p.includes("912 345 678")) return "manuel";
-    return "conceicao";
-  };
-  const fakeLogin = (who?: "conceicao" | "manuel") => {
+  const registerForm = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { nome: "", telefone: "", pin: "", pinConfirm: "", termos: true },
+  });
+
+  const handleLogin = async (data: LoginFormData) => {
     setLoading(true);
-    const user = who || determineUser();
-    setTimeout(() => {
+    setLoadingMsg("A verificar credenciais...");
+    try {
+      const result = await login(data);
+      onLogin(result.userId);
+    } catch (err) {
+      loginForm.setError("root", { message: "Credenciais inválidas. Tente novamente." });
+    } finally {
       setLoading(false);
-      onLogin(user);
-    }, 1200);
+      setLoadingMsg("");
+    }
   };
 
-  const PinRow = ({
-    values,
-    setter,
+  const handleRegister = async (data: RegisterFormData) => {
+    setLoading(true);
+    setLoadingMsg("A criar conta...");
+    try {
+      const result = await login({ telefone: data.telefone, pin: data.pin });
+      onLogin(result.userId);
+    } catch (err) {
+      registerForm.setError("root", { message: "Erro ao criar conta. Tente novamente." });
+    } finally {
+      setLoading(false);
+      setLoadingMsg("");
+    }
+  };
+
+  const fakeLogin = async (who: "conceicao" | "manuel") => {
+    setLoading(true);
+    setLoadingMsg("A entrar como demo...");
+    try {
+      const result = await login({
+        telefone: who === "manuel" ? "912345678" : "923456789",
+        pin: "1234",
+      });
+      onLogin(result.userId);
+    } finally {
+      setLoading(false);
+      setLoadingMsg("");
+    }
+  };
+
+  const FormField = ({
     label,
+    error,
+    children,
   }: {
-    values: string[];
-    setter: (v: string[]) => void;
-    label?: string;
+    label: string;
+    error?: string;
+    children: React.ReactNode;
   }) => (
     <div>
-      {label && (
-        <label
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--ink-2)",
-            display: "block",
-            marginBottom: 8,
-          }}
-        >
-          {label}
-        </label>
+      <label
+        style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--ink-2)",
+          display: "block",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+      {error && (
+        <span style={{ fontSize: 11, color: "var(--red)", marginTop: 4, display: "block" }}>
+          {error}
+        </span>
       )}
-      <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-        {values.map((d, i) => (
-          <input
-            key={i}
-            id={pinId(i)}
-            type="password"
-            inputMode="numeric"
-            maxLength={1}
-            value={d}
-            onChange={(e) => setPinAt(values, setter, i, e.target.value)}
-            onKeyDown={(e) => handlePinKey(values, i, e)}
-            style={{
-              width: 56,
-              height: 58,
-              textAlign: "center",
-              fontSize: 22,
-              fontFamily: "var(--font-num)",
-              fontWeight: 700,
-              border: "2px solid",
-              borderRadius: 14,
-              borderColor: d ? "var(--brand)" : "var(--border)",
-              background: d ? "var(--brand-light)" : "var(--card)",
-              color: "var(--ink)",
-              outline: "none",
-              transition: "all 200ms",
-            }}
-          />
-        ))}
-      </div>
     </div>
   );
+
+  const RootError = ({ message }: { message?: string }) =>
+    message ? (
+      <div
+        style={{
+          padding: "10px 14px",
+          background: "var(--red-light)",
+          color: "var(--red)",
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 500,
+          textAlign: "center",
+        }}
+      >
+        {message}
+      </div>
+    ) : null;
 
   const TabBtn = ({
     id,
@@ -111,6 +154,7 @@ export function AuthModal({
     icon: typeof User;
   }) => (
     <button
+      type="button"
       onClick={() => setTab(id)}
       style={{
         flex: 1,
@@ -165,19 +209,13 @@ export function AuthModal({
         </div>
 
         {tab === "entrar" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--ink-2)",
-                  display: "block",
-                  marginBottom: 6,
-                }}
-              >
-                Telemóvel
-              </label>
+          <form
+            onSubmit={loginForm.handleSubmit(handleLogin)}
+            style={{ display: "flex", flexDirection: "column", gap: 16 }}
+          >
+            <RootError message={loginForm.formState.errors.root?.message} />
+
+            <FormField label="Telemóvel" error={loginForm.formState.errors.telefone?.message}>
               <div
                 style={{
                   display: "flex",
@@ -185,10 +223,7 @@ export function AuthModal({
                   border: "1.5px solid var(--border)",
                   borderRadius: 12,
                   overflow: "hidden",
-                  transition: "border-color 200ms",
                 }}
-                onFocusCapture={(e) => (e.currentTarget.style.borderColor = "var(--brand)")}
-                onBlurCapture={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
               >
                 <span
                   style={{
@@ -207,23 +242,41 @@ export function AuthModal({
                 </span>
                 <input
                   className="kx-input"
-                  style={{ border: "none", background: "transparent", borderRadius: 0 }}
+                  style={{ border: "none", borderRadius: 0 }}
                   placeholder="9XX XXX XXX"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  {...loginForm.register("telefone")}
                 />
               </div>
-            </div>
+            </FormField>
 
-            <PinRow values={pin} setter={setPin} label="PIN de acesso" />
+            <FormField label="PIN de acesso" error={loginForm.formState.errors.pin?.message}>
+              <div style={{ position: "relative" }}>
+                <input
+                  className="kx-input"
+                  style={{ paddingRight: 44 }}
+                  type={showPin ? "text" : "password"}
+                  placeholder="4 dígitos"
+                  maxLength={4}
+                  inputMode="numeric"
+                  {...loginForm.register("pin")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPin(!showPin)}
+                  style={{ position: "absolute", right: 12, top: 10, color: "var(--ink-3)" }}
+                >
+                  {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </FormField>
 
             <button
-              onClick={() => fakeLogin()}
+              type="submit"
               disabled={loading}
               className="kx-btn kx-btn-primary"
               style={{ width: "100%", height: 50, fontSize: 15, marginTop: 4 }}
             >
-              {loading ? "A entrar..." : "Entrar no KixiPay"}
+              {loading ? loadingMsg : "Entrar no KixiPay"}
             </button>
 
             <div
@@ -242,6 +295,7 @@ export function AuthModal({
             </div>
 
             <button
+              type="button"
               onClick={() => fakeLogin("conceicao")}
               className="kx-btn"
               style={{
@@ -263,6 +317,7 @@ export function AuthModal({
               <ArrowRight size={16} />
             </button>
             <button
+              type="button"
               onClick={() => fakeLogin("manuel")}
               className="kx-btn"
               style={{
@@ -283,21 +338,15 @@ export function AuthModal({
               </span>
               <ArrowRight size={16} />
             </button>
-          </div>
+          </form>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--ink-2)",
-                  display: "block",
-                  marginBottom: 6,
-                }}
-              >
-                Nome completo
-              </label>
+          <form
+            onSubmit={registerForm.handleSubmit(handleRegister)}
+            style={{ display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <RootError message={registerForm.formState.errors.root?.message} />
+
+            <FormField label="Nome completo" error={registerForm.formState.errors.nome?.message}>
               <div style={{ position: "relative" }}>
                 <User
                   size={16}
@@ -306,24 +355,13 @@ export function AuthModal({
                 <input
                   className="kx-input"
                   placeholder="Ex: Maria João"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
                   style={{ paddingLeft: 40 }}
+                  {...registerForm.register("nome")}
                 />
               </div>
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--ink-2)",
-                  display: "block",
-                  marginBottom: 6,
-                }}
-              >
-                Telemóvel
-              </label>
+            </FormField>
+
+            <FormField label="Telemóvel" error={registerForm.formState.errors.telefone?.message}>
               <div style={{ position: "relative" }}>
                 <Smartphone
                   size={16}
@@ -332,13 +370,40 @@ export function AuthModal({
                 <input
                   className="kx-input"
                   placeholder="+244 9XX XXX XXX"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
                   style={{ paddingLeft: 40 }}
+                  {...registerForm.register("telefone")}
                 />
               </div>
-            </div>
-            <PinRow values={pinReg} setter={setPinReg} label="Criar PIN (4 dígitos)" />
+            </FormField>
+
+            <FormField
+              label="Criar PIN (4 dígitos)"
+              error={registerForm.formState.errors.pin?.message}
+            >
+              <input
+                className="kx-input"
+                type="password"
+                placeholder="4 dígitos"
+                maxLength={4}
+                inputMode="numeric"
+                {...registerForm.register("pin")}
+              />
+            </FormField>
+
+            <FormField
+              label="Confirmar PIN"
+              error={registerForm.formState.errors.pinConfirm?.message}
+            >
+              <input
+                className="kx-input"
+                type="password"
+                placeholder="Repetir PIN"
+                maxLength={4}
+                inputMode="numeric"
+                {...registerForm.register("pinConfirm")}
+              />
+            </FormField>
+
             <div>
               <label
                 style={{
@@ -351,39 +416,32 @@ export function AuthModal({
                   padding: "6px 0",
                 }}
               >
-                <div
-                  onClick={() => setTermos(!termos)}
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 6,
-                    border: "2px solid var(--border)",
-                    background: termos ? "var(--brand)" : "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 200ms",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                  }}
-                >
-                  {termos && <Check size={14} color="#fff" />}
-                </div>
+                <input
+                  type="checkbox"
+                  {...registerForm.register("termos")}
+                  style={{ width: 18, height: 18, accentColor: "var(--brand)" }}
+                />
                 Aceito os{" "}
                 <a href="#" style={{ color: "var(--brand)", textDecoration: "none" }}>
                   termos e condições
                 </a>
               </label>
+              {registerForm.formState.errors.termos && (
+                <span style={{ fontSize: 11, color: "var(--red)" }}>
+                  {registerForm.formState.errors.termos.message}
+                </span>
+              )}
             </div>
+
             <button
-              onClick={() => fakeLogin()}
+              type="submit"
               disabled={loading}
               className="kx-btn kx-btn-primary"
               style={{ width: "100%", height: 50, fontSize: 15, marginTop: 4 }}
             >
-              {loading ? "A criar conta..." : "Criar conta grátis"}
+              {loading ? loadingMsg : "Criar conta grátis"}
             </button>
-          </div>
+          </form>
         )}
 
         <div

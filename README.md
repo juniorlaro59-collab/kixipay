@@ -71,50 +71,51 @@ Plataforma angolana que digitaliza as **kixikilas** (poupança rotativa). Gere g
 
 ## Stack Técnica
 
-| Categoria       | Tecnologia                              |
-| --------------- | --------------------------------------- |
-| **Framework**   | TanStack Start (React 19, SSR)          |
-| **Linguagem**   | TypeScript 5.8                          |
-| **Roteamento**  | TanStack Router (file-based)            |
-| **Estado**      | TanStack Query, estado local (useState) |
-| **UI**          | Tailwind CSS 4, Radix UI primitives     |
-| **Charts**      | Chart.js + react-chartjs-2              |
-| **Formulários** | react-hook-form + zod                   |
-| **Ícones**      | lucide-react                            |
-| **Build**       | Vite 7 + Cloudflare Plugin              |
-| **Deploy**      | Cloudflare Workers                      |
-| **Code style**  | ESLint + Prettier                       |
+| Categoria      | Tecnologia                            |
+| -------------- | ------------------------------------- |
+| **Framework**  | TanStack Start (React 19, SSR)        |
+| **Linguagem**  | TypeScript 5.8                        |
+| **Roteamento** | TanStack Router (file-based)          |
+| **Estado**     | TanStack Query, react-hook-form + zod |
+| **UI**         | Tailwind CSS 4, Radix UI primitives   |
+| **Charts**     | Chart.js + react-chartjs-2            |
+| **Ícones**     | lucide-react                          |
+| **Build**      | Vite 7 + Cloudflare Plugin            |
+| **Deploy**     | Cloudflare Workers                    |
+| **Code style** | ESLint + Prettier                     |
 
 ---
 
-## Estrutura do Projecto
+## Arquitectura (Hackathon Ready)
+
+O código está estruturado em camadas para facilitar a integração com backend real:
 
 ```
 src/
-├── routes/
-│   ├── __root.tsx          # Root layout (HTML shell)
-│   └── index.tsx           # Rota única — orquestra Landing / AppShell / Modals
+├── types/              # Tipos centralizados (domain + API)
+│   └── index.ts
+├── lib/                # Utilitários e schemas de validação
+│   ├── constants.ts     # Constantes da aplicação
+│   ├── validations.ts   # Schemas Zod (login, registo, contribuição, …)
+│   └── utils.ts         # Utilitários gerais
+├── services/           # Camada de serviços (mock → API real)
+│   ├── client.ts        # Cliente HTTP (fetch wrapper + token)
+│   ├── auth.ts          # Autenticação
+│   ├── groups.ts        # Grupos, membros, dashboard, histórico
+│   ├── community.ts     # Comunidades, convites
+│   ├── score.ts         # KixiScore, elegibilidade
+│   ├── mock-data.ts     # Dados mock centralizados
+│   └── index.ts         # Barrel export
 ├── components/
-│   ├── ui/                 # Componentes UI genéricos (shadcn-style)
-│   │   ├── button.tsx, card.tsx, input.tsx, dialog.tsx, …
-│   │   └── chart.tsx       # Chart.js wrapper
-│   └── kixipay/            # Componentes específicos do KixiPay
-│       ├── Landing.tsx      # Landing page completa (~1588 linhas)
-│       ├── AppShell.tsx     # App pós-login: sidebar, views, member drawer (~2900 linhas)
-│       ├── Modals.tsx       # AuthModal, ContribuicaoModal, AddMembroModal, …
-│       ├── shared.tsx       # Componentes partilhados: Logo, Avatar, ScoreRing, Toast, Modal, …
-│       └── data.ts          # Dados mock: membros, histórico, comunidades, helpers
-├── hooks/
-│   └── use-mobile.tsx      # Hook de detecção mobile
-├── lib/
-│   ├── utils.ts            # Utilitários (cn())
-│   ├── error-page.ts       # Página de erro SSR
-│   └── error-capture.ts    # Captura de erros
-├── router.tsx              # Criação do router TanStack
-├── routeTree.gen.ts        # Árvore de rotas gerada automaticamente
-├── start.ts                # Entry point TanStack Start
-├── server.ts               # SSR server wrapper com error handling
-└── styles.css              # Design tokens, animações, classes utilitárias
+│   ├── ui/              # Componentes UI genéricos (shadcn-style)
+│   └── kixipay/         # Componentes específicos do KixiPay
+│       ├── Landing.tsx   # Landing page
+│       ├── AppShell.tsx  # App pós-login (sidebar, views, drawer)
+│       ├── Modals.tsx    # Modais (auth com react-hook-form, contribuição, …)
+│       ├── shared.tsx    # Componentes partilhados + Skeleton/Error/Empty states
+│       └── data.ts       # Re-export dos serviços (compatibilidade legada)
+├── routes/             # Rotas TanStack
+└── hooks/              # Custom hooks
 ```
 
 ### Ficheiros de Configuração
