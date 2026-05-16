@@ -2,33 +2,13 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Modal, Avatar, GeoQR, Logo } from "./shared";
-import { MEMBROS, fmtKz, eligivel, scoreLabel } from "./data";
-import type { Membro, UserId } from "./data";
-import {
-  Check,
-  Copy,
-  User,
-  Smartphone,
-  LogIn,
-  UserPlus,
-  Shield,
-  ArrowRight,
-  Eye,
-  EyeOff,
-} from "lucide-react";
-import {
-  loginSchema,
-  registerSchema,
-  contribuicaoSchema,
-  addMembroSchema,
-} from "@/lib/validations";
-import type {
-  LoginFormData,
-  RegisterFormData,
-  ContribuicaoFormData,
-  AddMembroFormData,
-} from "@/lib/validations";
-import { login, registrarContribuicao, addMembro } from "@/services";
+import { fmtKz, eligivel, scoreLabel } from "./data";
+import type { Membro } from "./data";
+import { Check, Copy, User, Smartphone, LogIn, UserPlus, Shield, Eye, EyeOff } from "lucide-react";
+import { loginSchema, registerSchema } from "@/lib/validations";
+import type { LoginFormData, RegisterFormData } from "@/lib/validations";
+import { login, register } from "@/services";
+import type { LoginResult } from "@/services";
 
 export function AuthModal({
   open,
@@ -37,7 +17,7 @@ export function AuthModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onLogin: (user: UserId) => void;
+  onLogin: (result: LoginResult) => void;
 }) {
   const [tab, setTab] = useState<"entrar" | "criar">("entrar");
   const [loading, setLoading] = useState(false);
@@ -58,10 +38,12 @@ export function AuthModal({
     setLoading(true);
     setLoadingMsg("A verificar credenciais...");
     try {
-      const result = await login(data);
-      onLogin(result.userId);
+      const result = await login(data.telefone, data.pin);
+      onLogin(result);
     } catch (err) {
-      loginForm.setError("root", { message: "Credenciais inválidas. Tente novamente." });
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error("[LOGIN ERROR]", msg);
+      loginForm.setError("root", { message: msg });
     } finally {
       setLoading(false);
       setLoadingMsg("");
@@ -72,32 +54,12 @@ export function AuthModal({
     setLoading(true);
     setLoadingMsg("A criar conta...");
     try {
-      const result = await login({ telefone: data.telefone, pin: data.pin });
-      onLogin(result.userId);
+      const result = await register(data.nome, data.telefone, data.pin);
+      onLogin(result);
     } catch (err) {
-      registerForm.setError("root", { message: "Erro ao criar conta. Tente novamente." });
-    } finally {
-      setLoading(false);
-      setLoadingMsg("");
-    }
-  };
-
-  const fakeLogin = async (who: UserId) => {
-    setLoading(true);
-    setLoadingMsg("A entrar como demo...");
-    try {
-      const phones: Record<UserId, string> = {
-        conceicao: "923456789",
-        manuel: "912345678",
-        admin: "900000001",
-        agente1: "900000002",
-        agente2: "900000003",
-      };
-      const result = await login({
-        telefone: phones[who] || "923456789",
-        pin: "0000",
-      });
-      onLogin(result.userId);
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error("[REGISTER ERROR]", msg);
+      registerForm.setError("root", { message: msg });
     } finally {
       setLoading(false);
       setLoadingMsg("");
@@ -256,15 +218,13 @@ export function AuthModal({
               </div>
             </FormField>
 
-            <FormField label="PIN de acesso" error={loginForm.formState.errors.pin?.message}>
+            <FormField label="Senha / PIN" error={loginForm.formState.errors.pin?.message}>
               <div style={{ position: "relative" }}>
                 <input
                   className="kx-input"
                   style={{ paddingRight: 44 }}
                   type={showPin ? "text" : "password"}
-                  placeholder="4 dígitos"
-                  maxLength={4}
-                  inputMode="numeric"
+                  placeholder="Mínimo 4 caracteres"
                   {...loginForm.register("pin")}
                 />
                 <button
@@ -285,108 +245,6 @@ export function AuthModal({
             >
               {loading ? loadingMsg : "Entrar no KixiPay"}
             </button>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                color: "var(--ink-3)",
-                fontSize: 12,
-                margin: "4px 0",
-              }}
-            >
-              <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-              <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>ou entra como demo</span>
-              <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => fakeLogin("conceicao")}
-              className="kx-btn"
-              style={{
-                width: "100%",
-                background: "var(--brand-light)",
-                color: "var(--brand-dark)",
-                fontWeight: 600,
-                height: 48,
-                borderRadius: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <Avatar iniciais="CM" cor="#FF5C1A" size={32} />
-              <span style={{ flex: 1, textAlign: "left" }}>
-                Demo como <strong>Coordenadora</strong>
-              </span>
-              <ArrowRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => fakeLogin("manuel")}
-              className="kx-btn"
-              style={{
-                width: "100%",
-                background: "var(--blue-light)",
-                color: "var(--blue)",
-                fontWeight: 600,
-                height: 48,
-                borderRadius: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <Avatar iniciais="MJ" cor="#1D4ED8" size={32} />
-              <span style={{ flex: 1, textAlign: "left" }}>
-                Demo como <strong>Membro</strong>
-              </span>
-              <ArrowRight size={16} />
-            </button>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <button
-                type="button"
-                onClick={() => fakeLogin("admin")}
-                className="kx-btn"
-                style={{
-                  flex: 1,
-                  background: "rgba(139,92,246,0.12)",
-                  color: "#8B5CF6",
-                  fontWeight: 600,
-                  height: 44,
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  fontSize: 13,
-                }}
-              >
-                <Shield size={16} /> Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => fakeLogin("agente1")}
-                className="kx-btn"
-                style={{
-                  flex: 1,
-                  background: "rgba(6,182,212,0.12)",
-                  color: "#06B6D4",
-                  fontWeight: 600,
-                  height: 44,
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  fontSize: 13,
-                }}
-              >
-                <User size={16} /> Agente
-              </button>
-            </div>
           </form>
         ) : (
           <form
@@ -425,30 +283,23 @@ export function AuthModal({
               </div>
             </FormField>
 
-            <FormField
-              label="Criar PIN (4 dígitos)"
-              error={registerForm.formState.errors.pin?.message}
-            >
+            <FormField label="Criar senha" error={registerForm.formState.errors.pin?.message}>
               <input
                 className="kx-input"
                 type="password"
-                placeholder="4 dígitos"
-                maxLength={4}
-                inputMode="numeric"
+                placeholder="Mínimo 4 caracteres"
                 {...registerForm.register("pin")}
               />
             </FormField>
 
             <FormField
-              label="Confirmar PIN"
+              label="Confirmar senha"
               error={registerForm.formState.errors.pinConfirm?.message}
             >
               <input
                 className="kx-input"
                 type="password"
-                placeholder="Repetir PIN"
-                maxLength={4}
-                inputMode="numeric"
+                placeholder="Repetir senha"
                 {...registerForm.register("pinConfirm")}
               />
             </FormField>
@@ -518,119 +369,66 @@ export function ContribuicaoModal({
   open,
   onClose,
   onConfirm,
-  prefill,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (msg: string) => void;
-  prefill?: Membro | null;
 }) {
   const [loading, setLoading] = useState(false);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setError,
-  } = useForm<ContribuicaoFormData>({
-    resolver: zodResolver(contribuicaoSchema),
-    defaultValues: {
-      membroId: prefill?.id ?? MEMBROS[0].id,
-      valor: 5000,
-      data: "2026-05-15",
-      metodo: "App",
-    },
-  });
-  const onSubmit = async (data: ContribuicaoFormData) => {
+  const [ref, setRef] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ref.trim()) {
+      setError("Indique a referência da transferência");
+      return;
+    }
     setLoading(true);
+    setError("");
     try {
-      await registrarContribuicao(data);
-      onConfirm(`Pagamento de ${fmtKz(data.valor)} registado com sucesso ✓`);
-    } catch {
-      setError("root", { message: "Erro ao registar contribuição. Tente novamente." });
+      const { getGrupo, getCurrentCycle, contributeToCycle } = await import("@/services");
+      const grupo = await getGrupo();
+      const cycle = await getCurrentCycle(grupo.id);
+      const result = await contributeToCycle(cycle.id, ref.trim());
+      onConfirm(result.message || "Contribuição registada com sucesso ✓");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao registar contribuição";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
-  const RootError = ({ message }: { message?: string }) =>
-    message ? (
-      <div
-        style={{
-          padding: "10px 14px",
-          background: "var(--red-light)",
-          color: "var(--red)",
-          borderRadius: 10,
-          fontSize: 13,
-          fontWeight: 500,
-          textAlign: "center",
-          marginBottom: 16,
-        }}
-      >
-        {message}
-      </div>
-    ) : null;
+
   return (
     <Modal open={open} onClose={onClose}>
-      <form onSubmit={handleSubmit(onSubmit)} style={{ padding: 32 }}>
+      <form onSubmit={handleSubmit} style={{ padding: 32 }}>
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 20 }}>
           Registar Contribuição
         </h2>
-        <RootError message={errors.root?.message} />
-        <label style={{ fontSize: 13, fontWeight: 600 }}>Membro</label>
-        <select
-          {...register("membroId", { valueAsNumber: true })}
-          className="kx-input"
-          style={{ marginTop: 6, marginBottom: 14 }}
-        >
-          {MEMBROS.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.nome}
-            </option>
-          ))}
-        </select>
-        <label style={{ fontSize: 13, fontWeight: 600 }}>Valor (Kz)</label>
+        {error && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "var(--red-light)",
+              color: "var(--red)",
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 500,
+              textAlign: "center",
+              marginBottom: 16,
+            }}
+          >
+            {error}
+          </div>
+        )}
+        <label style={{ fontSize: 13, fontWeight: 600 }}>Referência da transferência</label>
         <input
-          {...register("valor", { valueAsNumber: true })}
-          className="kx-input"
-          style={{ marginTop: 6, marginBottom: 14 }}
-        />
-        {errors.valor && (
-          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
-            {errors.valor.message}
-          </span>
-        )}
-        <label style={{ fontSize: 13, fontWeight: 600 }}>Data</label>
-        <input
-          {...register("data")}
-          type="date"
-          className="kx-input"
-          style={{ marginTop: 6, marginBottom: 14 }}
-        />
-        {errors.data && (
-          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
-            {errors.data.message}
-          </span>
-        )}
-        <label style={{ fontSize: 13, fontWeight: 600 }}>Método</label>
-        <select
-          {...register("metodo")}
-          className="kx-input"
-          style={{ marginTop: 6, marginBottom: 14 }}
-        >
-          <option value="App">App</option>
-          <option value="USSD">USSD</option>
-          <option value="Dinheiro presencial">Dinheiro presencial</option>
-        </select>
-        {errors.metodo && (
-          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
-            {errors.metodo.message}
-          </span>
-        )}
-        <label style={{ fontSize: 13, fontWeight: 600 }}>Notas (opcional)</label>
-        <textarea
-          {...register("notas")}
-          className="kx-input"
-          rows={2}
-          style={{ marginTop: 6, marginBottom: 20, resize: "vertical" }}
+          value={ref}
+          onChange={(e) => setRef(e.target.value)}
+          className="kx-input kx-mono"
+          placeholder="Ex: TRF-202605-001"
+          style={{ marginTop: 6, marginBottom: 20 }}
         />
         <div style={{ display: "flex", gap: 10 }}>
           <button
@@ -665,89 +463,66 @@ export function AddMembroModal({
   onConfirm: (msg: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setError,
-  } = useForm<AddMembroFormData>({
-    resolver: zodResolver(addMembroSchema),
-    defaultValues: { nome: "", telefone: "", email: "", posicao: 1 },
-  });
-  const onSubmit = async (data: AddMembroFormData) => {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim() || !telefone.trim()) {
+      setError("Preencha nome e telefone");
+      return;
+    }
     setLoading(true);
+    setError("");
     try {
-      await addMembro(data);
-      onConfirm(`${data.nome} adicionado ao grupo ✓ Convite enviado por SMS`);
-    } catch {
-      setError("root", { message: "Erro ao adicionar membro. Tente novamente." });
+      const { cadastrarMembro } = await import("@/services");
+      await cadastrarMembro({ nome: nome.trim(), telefone: telefone.trim(), regiao: "" });
+      onConfirm(`${nome} cadastrado com sucesso ✓`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao cadastrar membro";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
-  const RootError = ({ message }: { message?: string }) =>
-    message ? (
-      <div
-        style={{
-          padding: "10px 14px",
-          background: "var(--red-light)",
-          color: "var(--red)",
-          borderRadius: 10,
-          fontSize: 13,
-          fontWeight: 500,
-          textAlign: "center",
-          marginBottom: 16,
-        }}
-      >
-        {message}
-      </div>
-    ) : null;
+
   return (
     <Modal open={open} onClose={onClose}>
-      <form onSubmit={handleSubmit(onSubmit)} style={{ padding: 32 }}>
+      <form onSubmit={handleSubmit} style={{ padding: 32 }}>
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 20 }}>
           Adicionar membro ao grupo
         </h2>
-        <RootError message={errors.root?.message} />
+        {error && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "var(--red-light)",
+              color: "var(--red)",
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 500,
+              textAlign: "center",
+              marginBottom: 16,
+            }}
+          >
+            {error}
+          </div>
+        )}
         <input
-          {...register("nome")}
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
           className="kx-input"
           placeholder="Nome completo"
           style={{ marginBottom: 12 }}
         />
-        {errors.nome && (
-          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
-            {errors.nome.message}
-          </span>
-        )}
         <input
-          {...register("telefone")}
+          value={telefone}
+          onChange={(e) => setTelefone(e.target.value)}
           className="kx-input"
           placeholder="+244 9XX XXX XXX"
           style={{ marginBottom: 12 }}
         />
-        {errors.telefone && (
-          <span style={{ fontSize: 11, color: "var(--red)", display: "block", marginBottom: 8 }}>
-            {errors.telefone.message}
-          </span>
-        )}
-        <input
-          {...register("email")}
-          className="kx-input"
-          placeholder="Email (opcional)"
-          style={{ marginBottom: 12 }}
-        />
-        <select
-          {...register("posicao", { valueAsNumber: true })}
-          className="kx-input"
-          style={{ marginBottom: 20 }}
-        >
-          {Array.from({ length: 12 }, (_, i) => (
-            <option key={i + 1} value={i + 1}>
-              Posição {i + 1}
-            </option>
-          ))}
-        </select>
         <div style={{ display: "flex", gap: 10 }}>
           <button
             type="button"
@@ -763,7 +538,7 @@ export function AddMembroModal({
             className="kx-btn kx-btn-primary"
             style={{ flex: 1 }}
           >
-            {loading ? "A adicionar..." : "Adicionar ao grupo"}
+            {loading ? "A cadastrar..." : "Adicionar ao grupo"}
           </button>
         </div>
       </form>
@@ -782,47 +557,21 @@ export function ConfirmarPagamentoModal({
 }) {
   return (
     <Modal open={open} onClose={onClose}>
-      <div style={{ padding: 32 }}>
+      <div style={{ padding: 32, textAlign: "center" }}>
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 16 }}>
-          Confirmar Pagamento ao Manuel Jacinto
+          Confirmar Recebimento
         </h2>
-        <div
-          style={{
-            background: "var(--surface)",
-            padding: 20,
-            borderRadius: 16,
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-          }}
-        >
-          <Avatar iniciais="MJ" cor="#1D4ED8" size={56} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600 }}>Manuel Jacinto</div>
-            <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-              7º na rotação · 1 de Junho 2026
-            </div>
-          </div>
-          <div className="kx-num" style={{ fontSize: 22, color: "var(--green)" }}>
-            {fmtKz(60000)}
-          </div>
+        <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+          Confirma que o pagamento foi recebido?
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} className="kx-btn kx-btn-outline" style={{ flex: 1 }}>
+            Cancelar
+          </button>
+          <button onClick={onConfirm} className="kx-btn kx-btn-green" style={{ flex: 1 }}>
+            ✓ Confirmar recebimento
+          </button>
         </div>
-        <label style={{ fontSize: 13, fontWeight: 600 }}>
-          Referência de transferência (opcional)
-        </label>
-        <input
-          className="kx-input"
-          placeholder="Ex: TRF-202605-001"
-          style={{ marginTop: 6, marginBottom: 20 }}
-        />
-        <button
-          onClick={onConfirm}
-          className="kx-btn kx-btn-green"
-          style={{ width: "100%", height: 48 }}
-        >
-          ✓ Confirmar recebimento
-        </button>
       </div>
     </Modal>
   );

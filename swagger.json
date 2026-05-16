@@ -1,0 +1,1679 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Kixikila API",
+    "description": "API para Kixikila Digital: autenticacao JWT, gestao de grupos/ciclos, roles, pagamentos e fluxo USSD *404#. Endpoints protegidos exigem Authorization: Bearer {token}. Roles disponiveis: member, coordinator, agent, admin.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "Listar utilizadores",
+        "description": "Protegido por AdminOnly. Lista todos os utilizadores para backoffice.",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "Criar utilizador com role",
+        "description": "Protegido por AdminOnly. Permite criar member, coordinator, agent ou admin. Usar apenas em telas administrativas.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserByAdminRequest"
+              },
+              "examples": {
+                "createCoordinator": {
+                  "summary": "Criar coordenador pelo backoffice",
+                  "value": {
+                    "fullName": "Coordenador Teste",
+                    "phoneNumber": "+244923000010",
+                    "password": "123456",
+                    "role": "coordinator"
+                  }
+                },
+                "createAgent": {
+                  "summary": "Criar agente pelo backoffice",
+                  "value": {
+                    "fullName": "Agente Teste",
+                    "phoneNumber": "+244923000012",
+                    "password": "123456",
+                    "role": "agent"
+                  }
+                },
+                "createAdmin": {
+                  "summary": "Criar administrador",
+                  "value": {
+                    "fullName": "Admin Teste",
+                    "phoneNumber": "+244923000011",
+                    "password": "123456",
+                    "role": "admin"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserByAdminRequest"
+              },
+              "examples": {
+                "createCoordinator": {
+                  "summary": "Criar coordenador pelo backoffice",
+                  "value": {
+                    "fullName": "Coordenador Teste",
+                    "phoneNumber": "+244923000010",
+                    "password": "123456",
+                    "role": "coordinator"
+                  }
+                },
+                "createAgent": {
+                  "summary": "Criar agente pelo backoffice",
+                  "value": {
+                    "fullName": "Agente Teste",
+                    "phoneNumber": "+244923000012",
+                    "password": "123456",
+                    "role": "agent"
+                  }
+                },
+                "createAdmin": {
+                  "summary": "Criar administrador",
+                  "value": {
+                    "fullName": "Admin Teste",
+                    "phoneNumber": "+244923000011",
+                    "password": "123456",
+                    "role": "admin"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserByAdminRequest"
+              },
+              "examples": {
+                "createCoordinator": {
+                  "summary": "Criar coordenador pelo backoffice",
+                  "value": {
+                    "fullName": "Coordenador Teste",
+                    "phoneNumber": "+244923000010",
+                    "password": "123456",
+                    "role": "coordinator"
+                  }
+                },
+                "createAgent": {
+                  "summary": "Criar agente pelo backoffice",
+                  "value": {
+                    "fullName": "Agente Teste",
+                    "phoneNumber": "+244923000012",
+                    "password": "123456",
+                    "role": "agent"
+                  }
+                },
+                "createAdmin": {
+                  "summary": "Criar administrador",
+                  "value": {
+                    "fullName": "Admin Teste",
+                    "phoneNumber": "+244923000011",
+                    "password": "123456",
+                    "role": "admin"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/role": {
+      "put": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "Alterar role de utilizador",
+        "description": "Protegido por AdminOnly. Altera role de acesso. A API bloqueia remover a propria role Admin do utilizador autenticado.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRoleRequest"
+              },
+              "examples": {
+                "promote": {
+                  "summary": "Promover para admin",
+                  "value": {
+                    "role": "admin"
+                  }
+                },
+                "coordinator": {
+                  "summary": "Alterar para coordinator",
+                  "value": {
+                    "role": "coordinator"
+                  }
+                },
+                "agent": {
+                  "summary": "Alterar para agent",
+                  "value": {
+                    "role": "agent"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRoleRequest"
+              },
+              "examples": {
+                "promote": {
+                  "summary": "Promover para admin",
+                  "value": {
+                    "role": "admin"
+                  }
+                },
+                "coordinator": {
+                  "summary": "Alterar para coordinator",
+                  "value": {
+                    "role": "coordinator"
+                  }
+                },
+                "agent": {
+                  "summary": "Alterar para agent",
+                  "value": {
+                    "role": "agent"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRoleRequest"
+              },
+              "examples": {
+                "promote": {
+                  "summary": "Promover para admin",
+                  "value": {
+                    "role": "admin"
+                  }
+                },
+                "coordinator": {
+                  "summary": "Alterar para coordinator",
+                  "value": {
+                    "role": "coordinator"
+                  }
+                },
+                "agent": {
+                  "summary": "Alterar para agent",
+                  "value": {
+                    "role": "agent"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/agents/members": {
+      "post": {
+        "tags": [
+          "AgentMembers"
+        ],
+        "summary": "Cadastrar membro pelo agente",
+        "description": "Protegido por AgentsOrAdmins. Cadastra novo utilizador como member, sem permitir escolher role.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              },
+              "examples": {
+                "createMemberByAgent": {
+                  "summary": "Agente cadastra novo membro",
+                  "value": {
+                    "fullName": "Novo Membro",
+                    "phoneNumber": "+244923000020",
+                    "password": "123456"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              },
+              "examples": {
+                "createMemberByAgent": {
+                  "summary": "Agente cadastra novo membro",
+                  "value": {
+                    "fullName": "Novo Membro",
+                    "phoneNumber": "+244923000020",
+                    "password": "123456"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              },
+              "examples": {
+                "createMemberByAgent": {
+                  "summary": "Agente cadastra novo membro",
+                  "value": {
+                    "fullName": "Novo Membro",
+                    "phoneNumber": "+244923000020",
+                    "password": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Registar membro normal",
+        "description": "Cria uma conta publica para utilizador final. Esta rota nunca cria admin, agent ou coordinator; novos registos entram sempre como role member.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              },
+              "examples": {
+                "member": {
+                  "summary": "Registo publico: cria sempre member",
+                  "value": {
+                    "fullName": "Beatriz Gomes",
+                    "phoneNumber": "+244923000003",
+                    "password": "123456"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              },
+              "examples": {
+                "member": {
+                  "summary": "Registo publico: cria sempre member",
+                  "value": {
+                    "fullName": "Beatriz Gomes",
+                    "phoneNumber": "+244923000003",
+                    "password": "123456"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              },
+              "examples": {
+                "member": {
+                  "summary": "Registo publico: cria sempre member",
+                  "value": {
+                    "fullName": "Beatriz Gomes",
+                    "phoneNumber": "+244923000003",
+                    "password": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Autenticar e obter JWT",
+        "description": "Valida telefone e senha. Use o campo token da resposta no Swagger Authorize como: Bearer {token}.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "examples": {
+                "adminSeed": {
+                  "summary": "Login com admin do seed",
+                  "value": {
+                    "phoneNumber": "+244923000001",
+                    "password": "123456"
+                  }
+                },
+                "coordinatorSeed": {
+                  "summary": "Login com coordenador do seed",
+                  "value": {
+                    "phoneNumber": "+244923000002",
+                    "password": "123456"
+                  }
+                },
+                "agentSeed": {
+                  "summary": "Login com agente do seed",
+                  "value": {
+                    "phoneNumber": "+244923000006",
+                    "password": "123456"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "examples": {
+                "adminSeed": {
+                  "summary": "Login com admin do seed",
+                  "value": {
+                    "phoneNumber": "+244923000001",
+                    "password": "123456"
+                  }
+                },
+                "coordinatorSeed": {
+                  "summary": "Login com coordenador do seed",
+                  "value": {
+                    "phoneNumber": "+244923000002",
+                    "password": "123456"
+                  }
+                },
+                "agentSeed": {
+                  "summary": "Login com agente do seed",
+                  "value": {
+                    "phoneNumber": "+244923000006",
+                    "password": "123456"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "examples": {
+                "adminSeed": {
+                  "summary": "Login com admin do seed",
+                  "value": {
+                    "phoneNumber": "+244923000001",
+                    "password": "123456"
+                  }
+                },
+                "coordinatorSeed": {
+                  "summary": "Login com coordenador do seed",
+                  "value": {
+                    "phoneNumber": "+244923000002",
+                    "password": "123456"
+                  }
+                },
+                "agentSeed": {
+                  "summary": "Login com agente do seed",
+                  "value": {
+                    "phoneNumber": "+244923000006",
+                    "password": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Cycles/group/{groupId}/current": {
+      "get": {
+        "tags": [
+          "Cycles"
+        ],
+        "summary": "Consultar ciclo actual",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Cycles/group/{groupId}/start": {
+      "post": {
+        "tags": [
+          "Cycles"
+        ],
+        "summary": "Iniciar proximo ciclo",
+        "description": "Protegido por CoordinatorsOrAdmins. Cria o proximo ciclo para o grupo quando nao existe ciclo aberto.",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Cycles/contribute": {
+      "post": {
+        "tags": [
+          "Cycles"
+        ],
+        "summary": "Registar contribuicao manual",
+        "description": "Registo manual de contribuicao. Para pagamentos reais, preferir iniciar em /api/payments/initiate e confirmar pelo webhook.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterContributionRequest"
+              },
+              "examples": {
+                "manualContribution": {
+                  "summary": "Contribuicao manual",
+                  "value": {
+                    "cycleId": "00000000-0000-0000-0000-000000000000",
+                    "transactionReference": "MANUAL-001"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterContributionRequest"
+              },
+              "examples": {
+                "manualContribution": {
+                  "summary": "Contribuicao manual",
+                  "value": {
+                    "cycleId": "00000000-0000-0000-0000-000000000000",
+                    "transactionReference": "MANUAL-001"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterContributionRequest"
+              },
+              "examples": {
+                "manualContribution": {
+                  "summary": "Contribuicao manual",
+                  "value": {
+                    "cycleId": "00000000-0000-0000-0000-000000000000",
+                    "transactionReference": "MANUAL-001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Cycles/{cycleId}/contributions": {
+      "get": {
+        "tags": [
+          "Cycles"
+        ],
+        "summary": "Listar contribuicoes do ciclo",
+        "parameters": [
+          {
+            "name": "cycleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Groups": {
+      "post": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Criar grupo de Kixikila",
+        "description": "Cria grupo. Pela regra de negocio actual, apenas utilizadores com nivel financeiro Premium podem criar grupos.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupRequest"
+              },
+              "examples": {
+                "monthlyGroup": {
+                  "summary": "Grupo mensal",
+                  "value": {
+                    "name": "Kixikila Familia Luanda",
+                    "contributionAmount": 25000,
+                    "frequency": "Monthly",
+                    "maxMembers": 6,
+                    "guaranteeFundContribution": 1000
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupRequest"
+              },
+              "examples": {
+                "monthlyGroup": {
+                  "summary": "Grupo mensal",
+                  "value": {
+                    "name": "Kixikila Familia Luanda",
+                    "contributionAmount": 25000,
+                    "frequency": "Monthly",
+                    "maxMembers": 6,
+                    "guaranteeFundContribution": 1000
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupRequest"
+              },
+              "examples": {
+                "monthlyGroup": {
+                  "summary": "Grupo mensal",
+                  "value": {
+                    "name": "Kixikila Familia Luanda",
+                    "contributionAmount": 25000,
+                    "frequency": "Monthly",
+                    "maxMembers": 6,
+                    "guaranteeFundContribution": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Groups/join": {
+      "post": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Entrar num grupo",
+        "description": "Adiciona o utilizador autenticado a um grupo. Utilizadores Basic precisam de vouching de um membro Premium.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinGroupRequest"
+              },
+              "examples": {
+                "joinWithVoucher": {
+                  "summary": "Entrar com vouching",
+                  "value": {
+                    "groupId": "00000000-0000-0000-0000-000000000000",
+                    "vouchedByUserId": "00000000-0000-0000-0000-000000000000"
+                  }
+                },
+                "joinWithoutVoucher": {
+                  "summary": "Entrar sem vouching",
+                  "value": {
+                    "groupId": "00000000-0000-0000-0000-000000000000",
+                    "vouchedByUserId": null
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinGroupRequest"
+              },
+              "examples": {
+                "joinWithVoucher": {
+                  "summary": "Entrar com vouching",
+                  "value": {
+                    "groupId": "00000000-0000-0000-0000-000000000000",
+                    "vouchedByUserId": "00000000-0000-0000-0000-000000000000"
+                  }
+                },
+                "joinWithoutVoucher": {
+                  "summary": "Entrar sem vouching",
+                  "value": {
+                    "groupId": "00000000-0000-0000-0000-000000000000",
+                    "vouchedByUserId": null
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinGroupRequest"
+              },
+              "examples": {
+                "joinWithVoucher": {
+                  "summary": "Entrar com vouching",
+                  "value": {
+                    "groupId": "00000000-0000-0000-0000-000000000000",
+                    "vouchedByUserId": "00000000-0000-0000-0000-000000000000"
+                  }
+                },
+                "joinWithoutVoucher": {
+                  "summary": "Entrar sem vouching",
+                  "value": {
+                    "groupId": "00000000-0000-0000-0000-000000000000",
+                    "vouchedByUserId": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Groups/{groupId}": {
+      "get": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Consultar grupo",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Groups/my": {
+      "get": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Consultar grupo",
+        "description": "Retorna grupos activos do utilizador autenticado.",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Groups/{groupId}/leave": {
+      "delete": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Sair de grupo",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "Kixikila.API"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/payments/initiate": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Iniciar pagamento",
+        "description": "Cria PaymentTransaction pendente para o ciclo informado. O provedor real deve confirmar depois via webhook.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitiatePaymentRequest"
+              },
+              "examples": {
+                "ussd404Payment": {
+                  "summary": "Iniciar pagamento via *404#",
+                  "value": {
+                    "cycleId": "00000000-0000-0000-0000-000000000000",
+                    "phoneNumber": "+244923000001"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitiatePaymentRequest"
+              },
+              "examples": {
+                "ussd404Payment": {
+                  "summary": "Iniciar pagamento via *404#",
+                  "value": {
+                    "cycleId": "00000000-0000-0000-0000-000000000000",
+                    "phoneNumber": "+244923000001"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitiatePaymentRequest"
+              },
+              "examples": {
+                "ussd404Payment": {
+                  "summary": "Iniciar pagamento via *404#",
+                  "value": {
+                    "cycleId": "00000000-0000-0000-0000-000000000000",
+                    "phoneNumber": "+244923000001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/payments/{paymentId}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Consultar pagamento",
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/payments/webhook/ussd404": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Confirmar pagamento USSD *404#",
+        "description": "Webhook publico simulado para o provedor USSD *404#. Quando success=true, marca pagamento como Paid e regista a contribuicao.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentWebhookRequest"
+              },
+              "examples": {
+                "success": {
+                  "summary": "Confirmar pagamento com sucesso",
+                  "value": {
+                    "providerReference": "USSD404-20260515213000-abcd1234",
+                    "success": true,
+                    "failureReason": null
+                  }
+                },
+                "failed": {
+                  "summary": "Marcar pagamento como falhado",
+                  "value": {
+                    "providerReference": "USSD404-20260515213000-abcd1234",
+                    "success": false,
+                    "failureReason": "Utilizador cancelou no telefone"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentWebhookRequest"
+              },
+              "examples": {
+                "success": {
+                  "summary": "Confirmar pagamento com sucesso",
+                  "value": {
+                    "providerReference": "USSD404-20260515213000-abcd1234",
+                    "success": true,
+                    "failureReason": null
+                  }
+                },
+                "failed": {
+                  "summary": "Marcar pagamento como falhado",
+                  "value": {
+                    "providerReference": "USSD404-20260515213000-abcd1234",
+                    "success": false,
+                    "failureReason": "Utilizador cancelou no telefone"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentWebhookRequest"
+              },
+              "examples": {
+                "success": {
+                  "summary": "Confirmar pagamento com sucesso",
+                  "value": {
+                    "providerReference": "USSD404-20260515213000-abcd1234",
+                    "success": true,
+                    "failureReason": null
+                  }
+                },
+                "failed": {
+                  "summary": "Marcar pagamento como falhado",
+                  "value": {
+                    "providerReference": "USSD404-20260515213000-abcd1234",
+                    "success": false,
+                    "failureReason": "Utilizador cancelou no telefone"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/RiskAnalysis/me": {
+      "get": {
+        "tags": [
+          "RiskAnalysis"
+        ],
+        "summary": "Analisar risco com IA",
+        "description": "Usa os dados financeiros do utilizador e chama o LLM configurado para devolver risco, recomendacao e motivo.",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Consultar perfil autenticado",
+        "description": "Retorna os dados do utilizador autenticado, incluindo score, nivel financeiro e role de acesso.",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Users/me/score": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Consultar score e nivel",
+        "description": "Atalho para o front mostrar score, nivel e eventuais dividas pendentes.",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/Users/me/score-events/{eventType}": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Aplicar evento de score",
+        "description": "Protegido por CoordinatorsOrAdmins. Eventos aceites no servico: PaidBeforeDeadline, PaidOnTime, CompletedCycle, VouchedSuccess, AutoDebited, FundCovered, AbandonedGroup, VouchedDefault.",
+        "parameters": [
+          {
+            "name": "eventType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    },
+    "/api/ussd/session": {
+      "post": {
+        "tags": [
+          "Ussd"
+        ],
+        "summary": "Sessao USSD *404#",
+        "description": "Endpoint chamado pelo gateway USSD. serviceCode esperado: *404#. Responde texto puro com prefixo CON para continuar ou END para terminar.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UssdSessionRequest"
+              },
+              "examples": {
+                "mainMenu": {
+                  "summary": "Abrir menu *404#",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": ""
+                  }
+                },
+                "paymentMenu": {
+                  "summary": "Ver contribuicoes pendentes",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": "2"
+                  }
+                },
+                "payFirstOption": {
+                  "summary": "Escolher primeiro pagamento",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": "2*1"
+                  }
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UssdSessionRequest"
+              },
+              "examples": {
+                "mainMenu": {
+                  "summary": "Abrir menu *404#",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": ""
+                  }
+                },
+                "paymentMenu": {
+                  "summary": "Ver contribuicoes pendentes",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": "2"
+                  }
+                },
+                "payFirstOption": {
+                  "summary": "Escolher primeiro pagamento",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": "2*1"
+                  }
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UssdSessionRequest"
+              },
+              "examples": {
+                "mainMenu": {
+                  "summary": "Abrir menu *404#",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": ""
+                  }
+                },
+                "paymentMenu": {
+                  "summary": "Ver contribuicoes pendentes",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": "2"
+                  }
+                },
+                "payFirstOption": {
+                  "summary": "Escolher primeiro pagamento",
+                  "value": {
+                    "sessionId": "abc123",
+                    "phoneNumber": "+244923000001",
+                    "serviceCode": "*404#",
+                    "text": "2*1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Texto puro para gateway USSD. CON significa continuar sessao; END significa terminar."
+          },
+          "400": {
+            "description": "Pedido invalido ou regra de negocio falhou."
+          },
+          "401": {
+            "description": "Token ausente, invalido ou expirado."
+          },
+          "403": {
+            "description": "Utilizador autenticado sem role/policy necessaria."
+          },
+          "404": {
+            "description": "Recurso nao encontrado."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateGroupRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "contributionAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/PaymentFrequency"
+          },
+          "maxMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "guaranteeFundContribution": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateUserByAdminRequest": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InitiatePaymentRequest": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phoneNumber": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "JoinGroupRequest": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vouchedByUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "phoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentFrequency": {
+        "enum": [
+          "weekly",
+          "biweekly",
+          "monthly"
+        ],
+        "type": "string"
+      },
+      "PaymentWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "providerReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegisterContributionRequest": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "transactionReference": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegisterUserRequest": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateUserRoleRequest": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserRole": {
+        "enum": [
+          "member",
+          "coordinator",
+          "admin",
+          "agent"
+        ],
+        "type": "string"
+      },
+      "UssdSessionRequest": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "serviceCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Cole apenas o token JWT retornado pelo login. O Swagger adiciona o prefixo Bearer automaticamente.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ]
+}

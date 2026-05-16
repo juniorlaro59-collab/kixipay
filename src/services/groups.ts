@@ -1,151 +1,103 @@
-import { delay, IS_MOCK, get, post, put } from "./client";
-import type { Grupo, Membro, Transacao } from "@/types";
-import { MEMBROS, HISTORICO, GRUPO_MOCK } from "./mock-data";
+import { get, post, del } from "./client";
+import type { Grupo } from "@/types";
 
-export interface DashboardData {
-  saldoTotal: number;
-  membrosActivos: number;
-  totalMembros: number;
-  contribuicoesMes: number;
-  metaContribuicoes: number;
-  kixiScoreMedio: number;
-  proximoRecebimento: { nome: string; posicao: number; mes: string; valor: number } | null;
-  rotacao: { nome: string; posicao: number; mes: string }[];
+export interface CurrentCycle {
+  id: string;
+  groupId: string;
+  cycleNumber: number;
+  beneficiaryName: string;
+  deadlineDate: string;
+  status: string;
+  totalCollected: number;
+  totalContributions: number;
+  pendingContributions: number;
+}
+
+export interface CycleContribution {
+  id: string;
+  userName: string;
+  amount: number;
+  status: string;
+  paidAt: string;
 }
 
 export async function getGrupo(): Promise<Grupo> {
-  if (IS_MOCK) {
-    await delay(400);
-    return GRUPO_MOCK;
-  }
-  return get<Grupo>("/grupo");
+  const grupos = await get<Grupo[]>("/api/Groups/my");
+  return grupos[0];
 }
 
-export async function getDashboard(): Promise<DashboardData> {
-  if (IS_MOCK) {
-    await delay(500);
-    const pagas = MEMBROS.filter((m) => m.status === "Pago").length;
-    const scores = MEMBROS.map((m) => m.score);
-    const scoreMedio = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-    return {
-      saldoTotal: 185000,
-      membrosActivos: 12,
-      totalMembros: 12,
-      contribuicoesMes: pagas,
-      metaContribuicoes: 12,
-      kixiScoreMedio: scoreMedio,
-      proximoRecebimento: { nome: "Manuel Jacinto", posicao: 7, mes: "Junho 2026", valor: 60000 },
-      rotacao: MEMBROS.map((m) => ({
-        nome: m.nome,
-        posicao: m.posicao,
-        mes: [
-          "Dez 2025",
-          "Jan 2026",
-          "Fev 2026",
-          "Mar 2026",
-          "Abr 2026",
-          "Mai 2026",
-          "Jun 2026",
-          "Jul 2026",
-          "Ago 2026",
-          "Set 2026",
-          "Out 2026",
-          "Nov 2026",
-        ][m.posicao - 1],
-      })),
-    };
-  }
-  return get<DashboardData>("/grupo/dashboard");
+export async function getCurrentCycle(groupId: string): Promise<CurrentCycle> {
+  return get<CurrentCycle>(`/api/Cycles/group/${groupId}/current`);
 }
 
-export async function getMembros(filtro?: { search?: string; status?: string }): Promise<Membro[]> {
-  if (IS_MOCK) {
-    await delay(300);
-    return MEMBROS.filter((m) => {
-      if (filtro?.search && !m.nome.toLowerCase().includes(filtro.search.toLowerCase()))
-        return false;
-      if (filtro?.status && filtro.status !== "todos" && m.status !== filtro.status) return false;
-      return true;
-    });
-  }
-  return get<Membro[]>("/membros", filtro as Record<string, string>);
+export async function getContribuicoes(cycleId: string): Promise<CycleContribution[]> {
+  return get<CycleContribution[]>(`/api/Cycles/${cycleId}/contributions`);
 }
 
-export async function getHistorico(filtro?: {
-  periodo?: string;
-  tipo?: string;
-  membro?: string;
-}): Promise<Transacao[]> {
-  if (IS_MOCK) {
-    await delay(400);
-    let items = [...HISTORICO];
-    if (filtro?.membro) items = items.filter((t) => t.membro === filtro.membro);
-    if (filtro?.tipo && filtro.tipo !== "todos")
-      items = items.filter((t) => t.tipo === filtro.tipo);
-    return items;
-  }
-  return get<Transacao[]>("/historico", filtro as Record<string, string>);
+export async function contributeToCycle(
+  cycleId: string,
+  transactionReference?: string,
+): Promise<{ success: boolean; message: string }> {
+  return post("/api/Cycles/contribute", {
+    cycleId,
+    transactionReference: transactionReference || `MANUAL-${Date.now()}`,
+  });
 }
 
-export async function updateGrupo(data: Partial<Grupo>): Promise<Grupo> {
-  if (IS_MOCK) {
-    await delay(600);
-    return { ...GRUPO_MOCK, ...data };
-  }
-  return put<Grupo>("/grupo", data);
+export type PaymentFrequency = "weekly" | "biweekly" | "monthly";
+
+export async function createGroup(data: {
+  name: string;
+  contributionAmount: number;
+  frequency: PaymentFrequency;
+  maxMembers: number;
+  guaranteeFundContribution: number;
+}): Promise<Grupo> {
+  return post<Grupo>("/api/Groups", data);
 }
 
-export interface ContribuicaoInput {
-  membroId: number;
-  valor: number;
-  data: string;
-  metodo: "App" | "USSD" | "Dinheiro presencial";
-  notas?: string;
+export async function getGroupById(groupId: string): Promise<Grupo> {
+  return get<Grupo>(`/api/Groups/${groupId}`);
 }
 
-export async function registrarContribuicao(data: ContribuicaoInput): Promise<Transacao> {
-  if (IS_MOCK) {
-    await delay(600);
-    const membro = MEMBROS.find((m) => m.id === data.membroId);
-    return {
-      id: HISTORICO.length + 1,
-      data: data.data,
-      membro: membro?.nome || "Desconhecido",
-      tipo: "Contribuição",
-      valor: data.valor,
-      ref: `KXP-${data.data.replace(/\//g, "").slice(0, 4)}-${String(HISTORICO.length + 1).padStart(3, "0")}`,
-      status: "Pago",
-    };
-  }
-  return post<Transacao>("/contribuicoes", data);
+export async function leaveGroup(groupId: string): Promise<{ success: boolean; message: string }> {
+  return del(`/api/Groups/${groupId}/leave`);
 }
 
-export async function addMembro(data: {
-  nome: string;
-  telefone: string;
-  email?: string;
-  posicao: number;
-}): Promise<Membro> {
-  if (IS_MOCK) {
-    await delay(800);
-    return {
-      id: MEMBROS.length + 1,
-      nome: data.nome,
-      tel: data.telefone,
-      posicao: data.posicao,
-      totalPoupado: 0,
-      score: 300,
-      status: "Pendente",
-      iniciais: data.nome
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase(),
-      cor: "#FF5C1A",
-      meses: 0,
-      pontualidade: 0,
-    };
-  }
-  return post<Membro>("/membros", data);
+export async function startCycle(groupId: string): Promise<{ success: boolean; message: string }> {
+  return post(`/api/Cycles/group/${groupId}/start`, {});
+}
+
+export async function getAllGroups(): Promise<Grupo[]> {
+  return get<Grupo[]>("/api/Groups");
+}
+
+export async function getGroupJoinRequests(
+  groupId: string,
+): Promise<
+  {
+    id: string;
+    userId: string;
+    fullName: string;
+    phoneNumber: string;
+    status: string;
+    createdAt: string;
+  }[]
+> {
+  return get(`/api/Groups/${groupId}/join-requests`);
+}
+
+export async function approveJoinRequest(
+  requestId: string,
+): Promise<{ success: boolean; message: string }> {
+  return post(`/api/Groups/join-requests/${requestId}/approve`, {});
+}
+
+export async function rejectJoinRequest(
+  requestId: string,
+  reason?: string,
+): Promise<{ success: boolean; message: string }> {
+  return post(`/api/Groups/join-requests/${requestId}/reject`, {
+    reason: reason || "Pedido rejeitado",
+  });
 }

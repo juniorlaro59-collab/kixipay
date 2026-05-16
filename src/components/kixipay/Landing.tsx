@@ -220,7 +220,7 @@ export function Hero({ onAuth }: { onAuth: () => void }) {
             className="kx-pill"
             style={{ background: "var(--brand-light)", color: "var(--brand)", fontWeight: 600 }}
           >
-            🇦🇴 Feito em Angola para Angola
+            Kixipay - A tua Kixikila
           </span>
           <h1
             className="kx-display"
@@ -360,7 +360,7 @@ function HeroVisual() {
             style={{ marginTop: 14, padding: 12, background: "var(--surface)", borderRadius: 12 }}
           >
             <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 600, marginBottom: 6 }}>
-              RECEBE EM JUNHO
+              Próximo a receber
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Avatar iniciais="MJ" cor="#1D4ED8" size={32} />
@@ -1837,74 +1837,304 @@ function AdminLanding() {
     <section
       style={{
         padding: "100px 24px",
-        background: "linear-gradient(180deg, var(--surface) 0%, #1a1a2e 100%)",
+        background: "var(--dark-bg)",
       }}
     >
-      <div style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
-        <span
-          style={{
-            background: "rgba(139,92,246,0.15)",
-            color: "#8B5CF6",
-            padding: "4px 14px",
-            borderRadius: 100,
-            fontSize: 12,
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-          }}
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}
+          className="kx-admin-grid"
         >
-          ⚙️ Gestão Centralizada
-        </span>
-        <h2
-          className="kx-display"
-          style={{ fontSize: 36, marginTop: 20, marginBottom: 12, color: "#fff" }}
-        >
-          Painel de Administração
-        </h2>
-        <p
-          style={{
-            color: "#999",
-            fontSize: 15,
-            maxWidth: 600,
-            margin: "0 auto 48px",
-            lineHeight: 1.6,
-          }}
-        >
-          Controla todos os aspectos da plataforma: membros, agentes, coordenadores, grupos e
-          análise de score — tudo num painel centralizado.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
-          {[
-            {
-              icon: "👥",
-              label: "Gestão de Membros",
-              desc: "Cadastro, remoção e histórico completo",
-            },
-            { icon: "🕵️", label: "Controlo de Agentes", desc: "Metas, desempenho e regiões" },
-            { icon: "🤖", label: "Análise IA", desc: "Predições, alertas e score" },
-            { icon: "📊", label: "Relatórios", desc: "Estatísticas e crescimento da plataforma" },
-          ].map((f) => (
-            <div
-              key={f.label}
-              className="kx-card kx-card-hover"
-              style={{ padding: 24, borderRadius: 16, background: "var(--card)" }}
+          <div>
+            <span
+              style={{
+                background: "var(--brand-light)",
+                color: "var(--brand)",
+                padding: "4px 14px",
+                borderRadius: 100,
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
             >
-              <div style={{ fontSize: 32, marginBottom: 12 }}>{f.icon}</div>
-              <h3
+              ⚙️ Gestão Centralizada
+            </span>
+            <h2
+              className="kx-display"
+              style={{ fontSize: 36, marginTop: 20, marginBottom: 16, color: "#fff" }}
+            >
+              Controla Toda a Plataforma num{" "}
+              <span style={{ color: "var(--brand)" }}>Painel Unificado</span>
+            </h2>
+            <p
+              style={{
+                color: "var(--ink-3)",
+                fontSize: 15,
+                lineHeight: 1.7,
+                marginBottom: 28,
+                maxWidth: 480,
+              }}
+            >
+              Membros, agentes, coordenadores, grupos, análise de score e muito mais — tudo
+              organizado num painel feito para quem gere o ecossistema KixiPay.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {[
+                {
+                  icon: "👥",
+                  label: "Gestão de Membros",
+                  desc: "Cadastro, remoção, histórico completo e pesquisa avançada",
+                },
+                {
+                  icon: "🕵️",
+                  label: "Controlo de Agentes",
+                  desc: "Metas mensais, desempenho por região, comissões e status",
+                },
+                {
+                  icon: "🤖",
+                  label: "Análise IA",
+                  desc: "Predições de score, alertas de risco e membros em atenção",
+                },
+                {
+                  icon: "📊",
+                  label: "Relatórios e Métricas",
+                  desc: "Estatísticas em tempo real, auditoria e crescimento da plataforma",
+                },
+              ].map((f) => (
+                <div
+                  key={f.label}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 14,
+                    padding: "14px 18px",
+                    background: "var(--dark-card)",
+                    borderRadius: 12,
+                    border: "1px solid var(--dark-border)",
+                  }}
+                >
+                  <span style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>{f.icon}</span>
+                  <div>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: 14,
+                        color: "#fff",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {f.label}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#999", lineHeight: 1.4 }}>{f.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            style={{
+              background: "var(--dark-card)",
+              borderRadius: 24,
+              border: "1px solid var(--dark-border)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                background: "var(--dark-bg)",
+                padding: "14px 20px",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                borderBottom: "1px solid var(--dark-border)",
+              }}
+            >
+              <span
                 style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 16,
-                  fontWeight: 700,
-                  marginBottom: 6,
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "#FF5F56",
+                }}
+              />
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "#FFBD2E",
+                }}
+              />
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "#27C93F",
+                }}
+              />
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 11,
+                  color: "var(--ink-3)",
+                  fontFamily: "var(--font-mono)",
                 }}
               >
-                {f.label}
-              </h3>
-              <p style={{ color: "var(--ink-3)", fontSize: 13, lineHeight: 1.5 }}>{f.desc}</p>
+                admin.kixipay.ao
+              </span>
             </div>
-          ))}
+            <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                }}
+              >
+                {[
+                  { label: "Membros", value: "156", cor: "var(--brand)" },
+                  { label: "Grupos", value: "23", cor: "var(--blue)" },
+                  { label: "Agentes", value: "14", cor: "var(--gold)" },
+                  { label: "Volume", value: "12.4M Kz", cor: "var(--green)" },
+                ].map((s) => (
+                  <div
+                    key={s.label}
+                    style={{
+                      background: "var(--dark-bg)",
+                      borderRadius: 12,
+                      padding: "14px 16px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: "var(--font-num)",
+                        fontSize: 24,
+                        fontWeight: 700,
+                        color: s.cor,
+                      }}
+                    >
+                      {s.value}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
+                      {s.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div
+                style={{
+                  background: "var(--dark-bg)",
+                  borderRadius: 12,
+                  padding: 16,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "var(--ink-3)",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    marginBottom: 12,
+                  }}
+                >
+                  Membros em Risco 🚨
+                </div>
+                {[
+                  { nome: "Rosa Amélia", score: 756, status: "Pendente", icon: "🟡" },
+                  { nome: "Carlos Futila", score: 423, status: "Crítico", icon: "🔴" },
+                  { nome: "Beatriz Capita", score: 601, status: "Atenção", icon: "🟠" },
+                ].map((m) => (
+                  <div
+                    key={m.nome}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "8px 0",
+                      borderBottom: "1px solid var(--dark-border)",
+                    }}
+                  >
+                    <span>{m.icon}</span>
+                    <span style={{ flex: 1, fontSize: 13, color: "#ddd" }}>{m.nome}</span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-num)",
+                        fontSize: 13,
+                        color: m.score < 500 ? "#EF4444" : m.score < 700 ? "#F59E0B" : "#10B981",
+                      }}
+                    >
+                      {m.score}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 100,
+                        background:
+                          m.status === "Crítico"
+                            ? "rgba(239,68,68,0.15)"
+                            : m.status === "Atenção"
+                              ? "rgba(245,158,11,0.15)"
+                              : "rgba(255,255,255,0.06)",
+                        color:
+                          m.status === "Crítico"
+                            ? "#EF4444"
+                            : m.status === "Atenção"
+                              ? "#F59E0B"
+                              : "#888",
+                      }}
+                    >
+                      {m.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div
+                style={{
+                  background: "linear-gradient(135deg, var(--brand-light), rgba(6,182,212,0.15))",
+                  borderRadius: 12,
+                  padding: 16,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Score Médio</div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-num)",
+                      fontSize: 28,
+                      fontWeight: 700,
+                      color: "var(--brand)",
+                    }}
+                  >
+                    742
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>Crescimento</div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-num)",
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: "var(--green)",
+                    }}
+                  >
+                    +12%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+      <style>{`@media (max-width: 900px) { .kx-admin-grid { grid-template-columns: 1fr !important; } }`}</style>
     </section>
   );
 }

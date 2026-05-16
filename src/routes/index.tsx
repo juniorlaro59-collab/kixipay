@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback, useEffect } from "react";
 import { Landing } from "@/components/kixipay/Landing";
-import { AppShell, MemberDrawer } from "@/components/kixipay/AppShell";
+import { CoordinatorShell } from "@/components/coordinator/CoordinatorShell";
+import { MemberShell } from "@/components/member/MemberShell";
+import { MemberDrawer } from "@/components/shared/MemberDrawer";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import AgentPanel from "@/components/agent/AgentPanel";
 import {
@@ -12,9 +14,11 @@ import {
   RecomendacaoModal,
 } from "@/components/kixipay/Modals";
 import { ToastContainer, type Toast } from "@/components/kixipay/shared";
-import type { Membro, UserId, Role as UserRole } from "@/components/kixipay/data";
+import type { Membro } from "@/components/kixipay/data";
 import { setAuthUser, persistAuth, restoreAuth, logout as authLogout } from "@/lib/auth-store";
 import type { LoginResult } from "@/services";
+import { getCurrentUser } from "@/services";
+import type { ApiUser } from "@/services";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -45,10 +49,11 @@ type ModalKind =
   | "recomendacao"
   | null;
 
-type AppUser = { userId: UserId; nome: string; role: UserRole } | null;
+type AppUser = { userId: string; nome: string; role: string } | null;
 
 function KixiPayApp() {
   const [user, setUser] = useState<AppUser>(null);
+  const [apiUser, setApiUser] = useState<ApiUser | null>(null);
   const [modal, setModal] = useState<ModalKind>(null);
   const [drawerMem, setDrawerMem] = useState<Membro | null>(null);
   const [modalMem, setModalMem] = useState<Membro | null>(null);
@@ -56,12 +61,33 @@ function KixiPayApp() {
 
   useEffect(() => {
     const saved = restoreAuth();
-    if (saved) setUser({ userId: saved.userId, nome: saved.nome, role: saved.role });
+    if (saved) {
+      setUser({ userId: saved.userId, nome: saved.nome, role: saved.role });
+      getCurrentUser()
+        .then(setApiUser)
+        .catch(() => {
+          setUser(null);
+          setAuthUser(null);
+          authLogout();
+        });
+    }
   }, []);
 
   const pushToast = useCallback((tipo: Toast["tipo"], mensagem: string) => {
     setToasts((t) => [...t.slice(-2), { id: Date.now() + Math.random(), tipo, mensagem }]);
   }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setUser(null);
+      setApiUser(null);
+      setAuthUser(null);
+      authLogout();
+      pushToast("info", "Sessão expirada. Faça login novamente.");
+    };
+    window.addEventListener("auth:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", onUnauthorized);
+  }, [pushToast]);
   const closeToast = useCallback(
     (id: number) => setToasts((t) => t.filter((x) => x.id !== id)),
     [],
@@ -73,38 +99,23 @@ function KixiPayApp() {
     setModal(m);
   }, []);
 
-  const handleLogin = (who: UserId) => {
-    const nome =
-      who === "conceicao"
-        ? "Conceição Mateus"
-        : who === "manuel"
-          ? "Manuel Jacinto"
-          : who === "admin"
-            ? "Administrador"
-            : who === "agente1"
-              ? "Maria Agostinho"
-              : "Pedro Kussumua";
-    const role: UserRole =
-      who === "admin"
-        ? "admin"
-        : who === "agente1" || who === "agente2"
-          ? "agent"
-          : who === "conceicao"
-            ? "coordinator"
-            : "member";
-    const authUser = { userId: who, nome, role, token: `kx_mock_${who}_${Date.now()}` };
-    setUser({ userId: who, nome, role });
-    setAuthUser(authUser);
+  const handleLogin = (result: LoginResult) => {
+    const { userId, nome, role } = result;
+    setUser({ userId, nome, role });
+    setAuthUser({ userId, nome, role, token: result.token });
     persistAuth();
     setModal(null);
+    getCurrentUser()
+      .then(setApiUser)
+      .catch(() => {});
     const msg =
       role === "admin"
         ? "Bem-vindo ao painel administrativo 👋"
         : role === "agent"
           ? `Bem-vindo, ${nome}! 👋`
-          : who === "conceicao"
-            ? "Bem-vinda, Conceição! 👋"
-            : "Bem-vindo, Manuel! 👋";
+          : role === "coordinator"
+            ? `Bem-vinda, ${nome}! 👋`
+            : `Bem-vindo, ${nome}! 👋`;
     pushToast("sucesso", msg);
   };
 
@@ -135,7 +146,7 @@ function KixiPayApp() {
   }
 
   if (user.role === "agent") {
-    const agentId = user.userId === "agente1" ? 1 : user.userId === "agente2" ? 2 : 1;
+    const agentId = user.userId;
     return (
       <>
         <AgentPanel
@@ -151,20 +162,60 @@ function KixiPayApp() {
 
   return (
     <>
-      <AppShell
-        user={user.userId as "conceicao" | "manuel"}
-        role={user.role as "coordinator" | "member"}
-        onLogout={handleLogout}
-        openModal={openModal}
-        openDrawer={setDrawerMem}
-        toast={pushToast}
-      />
+      {(() => {
+        const fallbackMembro: Membro = {
+          id: 1,
+          nome: user.nome,
+          tel: "+244 900 000 000",
+          posicao: 1,
+          totalPoupado: 0,
+          score: 0,
+          status: "Pendente",
+          iniciais: user.nome
+            .split(" ")
+            .map((s) => s[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase(),
+          cor: "#FF5C1A",
+          meses: 1,
+          pontualidade: 100,
+        };
+        const membro = apiUser
+          ? {
+              ...fallbackMembro,
+              id: 1,
+              nome: apiUser.fullName,
+              tel: apiUser.phoneNumber,
+              score: apiUser.score,
+              status: apiUser.pendingDebt > 0 ? ("Em atraso" as const) : ("Pago" as const),
+            }
+          : fallbackMembro;
+        if (user.role === "coordinator") {
+          return (
+            <CoordinatorShell
+              user={membro}
+              onLogout={handleLogout}
+              openModal={openModal}
+              openDrawer={setDrawerMem}
+              toast={pushToast}
+            />
+          );
+        }
+        return (
+          <MemberShell
+            user={membro}
+            onLogout={handleLogout}
+            openModal={openModal}
+            toast={pushToast}
+          />
+        );
+      })()}
 
       <AuthModal open={modal === "auth"} onClose={() => setModal(null)} onLogin={handleLogin} />
       <ContribuicaoModal
         open={modal === "contribuicao"}
         onClose={() => setModal(null)}
-        prefill={modalMem}
         onConfirm={(msg) => {
           setModal(null);
           pushToast("sucesso", msg);

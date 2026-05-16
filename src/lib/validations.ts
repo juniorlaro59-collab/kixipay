@@ -1,25 +1,16 @@
 import { z } from "zod";
-import {
-  PIN_LENGTH,
-  PHONE_REGEX,
-  NOME_MIN_LENGTH,
-  NOME_MAX_LENGTH,
-  CONTRIBUICAO_MIN,
-} from "./constants";
+import { NOME_MIN_LENGTH, NOME_MAX_LENGTH, CONTRIBUICAO_MIN } from "./constants";
 
-export const phoneSchema = z
-  .string()
-  .min(7, "Telefone inválido")
-  .regex(PHONE_REGEX, "Formato: 9XX XXX XXX");
+export const phoneSchema = z.string().min(7, "Telefone inválido");
 
-export const pinSchema = z
+export const passwordSchema = z
   .string()
-  .length(PIN_LENGTH, `PIN deve ter ${PIN_LENGTH} dígitos`)
-  .regex(/^\d{4}$/, "PIN deve conter apenas números");
+  .min(4, "Mínimo 4 caracteres")
+  .max(20, "Máximo 20 caracteres");
 
 export const loginSchema = z.object({
   telefone: phoneSchema,
-  pin: pinSchema,
+  pin: passwordSchema,
 });
 
 export const registerSchema = z
@@ -30,11 +21,11 @@ export const registerSchema = z
       .max(NOME_MAX_LENGTH, `Máximo ${NOME_MAX_LENGTH} caracteres`)
       .regex(/^[a-zA-ZÀ-ÿ\s]+$/, "Apenas letras e espaços"),
     telefone: phoneSchema,
-    pin: pinSchema,
+    pin: passwordSchema,
     pinConfirm: z.string(),
     termos: z.literal(true, { errorMap: () => ({ message: "Aceite os termos para continuar" }) }),
   })
-  .refine((d) => d.pin === d.pinConfirm, { message: "PINs não coincidem", path: ["pinConfirm"] });
+  .refine((d) => d.pin === d.pinConfirm, { message: "Senhas não coincidem", path: ["pinConfirm"] });
 
 export const contribuicaoSchema = z.object({
   membroId: z.number().positive(),
@@ -55,7 +46,7 @@ export const perfilSchema = z.object({
   nome: z.string().min(NOME_MIN_LENGTH).max(NOME_MAX_LENGTH),
   telefone: phoneSchema,
   email: z.string().email().optional().or(z.literal("")),
-  pin: pinSchema,
+  pin: passwordSchema,
 });
 
 export const grupoSchema = z.object({

@@ -3,12 +3,6 @@
 // Novos componentes devem importar directamente de "@/services" ou "@/types".
 
 export {
-  MEMBROS,
-  HISTORICO,
-  COMUNIDADES,
-  REGIOES,
-  NOTIFICACOES,
-  GRUPO_MOCK,
   fmtKz,
   scoreColor,
   scoreLabel,

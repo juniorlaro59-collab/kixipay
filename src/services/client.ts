@@ -14,6 +14,13 @@ export function setToken(token: string) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem("kx_user");
+}
+
+function dispatchUnauthorized() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+  }
 }
 
 export class ApiClientError extends Error {
@@ -29,9 +36,11 @@ export class ApiClientError extends Error {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  console.log("Estou aquiiiiiiii");
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
     ...(options.headers as Record<string, string>),
   };
 
@@ -42,21 +51,29 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers,
   });
 
+  if (res.status === 401) {
+    clearToken();
+    dispatchUnauthorized();
+    throw new ApiClientError(401, "UNAUTHORIZED", "Sessão expirada. Faça login novamente.");
+  }
+
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: ApiError };
-    throw new ApiClientError(
-      res.status,
-      body.error?.code || "UNKNOWN",
-      body.error?.message || `Erro ${res.status}`,
-      body.error?.details,
-    );
+    const body = (await res.json().catch(() => ({}))) as { error?: ApiError; message?: string };
+    const msg = body.error?.message || body.message || `Erro ${res.status}`;
+    console.error(`[API ERROR] ${res.status} ${endpoint}:`, msg);
+    throw new ApiClientError(res.status, body.error?.code || "REQ_ERROR", msg, body.error?.details);
   }
 
   const json = (await res.json()) as ApiResponse<T>;
-  return json.data;
+
+  if (json.success === false) {
+    throw new ApiClientError(res.status, "API_ERROR", json.message || "Erro da API");
+  }
+
+  if (json.data !== undefined) return json.data;
+  return json as unknown as T;
 }
 
-// GET with simulated delay for mock mode
 export async function get<T>(endpoint: string, params?: Record<string, string>) {
   const qs = params ? "?" + new URLSearchParams(params) : "";
   return request<T>(`${endpoint}${qs}`);
@@ -73,11 +90,3 @@ export async function put<T>(endpoint: string, body: unknown) {
 export async function del<T>(endpoint: string) {
   return request<T>(endpoint, { method: "DELETE" });
 }
-
-// ─── Mock delay helper ──────────────────────────────────────────────────
-export function delay(ms = 600): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-// Flag to switch between mock and real API
-export const IS_MOCK = !import.meta.env.VITE_API_URL;

@@ -1,7 +1,7 @@
 // ─── Domain Types ───────────────────────────────────────────────────────
 
 export type UserRole = "admin" | "agent" | "coordinator" | "member";
-export type UserId = "admin" | "agente1" | "agente2" | "conceicao" | "manuel";
+export type UserId = string;
 
 export type MemberStatus = "Pago" | "Pendente" | "Em atraso";
 export type TxStatus = "Pago" | "Pendente" | "Em atraso" | "Recebido" | "Enviado" | "Recuperado";
@@ -60,29 +60,13 @@ export interface Notificacao {
   data: string;
 }
 
-export interface Convite {
-  id: number;
-  codigo: string;
-  grupoNome: string;
-  enviadoPor: string;
-  link: string;
-  usado: boolean;
-}
-
 // ─── API Types ──────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
   data: T;
   success: boolean;
   message?: string;
-  timestamp: string;
-}
-
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  timestamp?: string;
 }
 
 export interface ApiError {
@@ -106,12 +90,16 @@ export interface RegisterRequest {
   termos: boolean;
 }
 
-export interface AuthResponse {
+export interface ApiLoginResponse {
+  token: string;
   user: {
-    id: UserId;
-    nome: string;
-    role: UserRole;
-    token: string;
+    id: string;
+    fullName: string;
+    phoneNumber: string;
+    score: number;
+    level: string;
+    role: string;
+    pendingDebt: number;
   };
 }
 
@@ -130,17 +118,6 @@ export interface Elegibilidade {
   ok: boolean;
   limite: number;
   banco: string;
-}
-
-// ─── Filter Types ────────────────────────────────────────────────────────
-export interface PeriodoFilter {
-  label: string;
-  value: string;
-}
-
-export interface MembroFilter {
-  search?: string;
-  status?: MemberStatus | "todos";
 }
 
 // ─── Admin Types ─────────────────────────────────────────────────────────
@@ -258,4 +235,11 @@ export interface CadastroPayload {
   grupoCodigo?: string;
   coordenadorNome?: string;
   observacoes?: string;
+}
+
+// ─── Filter Types ────────────────────────────────────────────────────────
+
+export interface MembroFilter {
+  search?: string;
+  status?: MemberStatus | "todos";
 }

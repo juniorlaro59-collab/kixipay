@@ -1,0 +1,527 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Kixikila API",
+    "version": "1.1.0",
+    "description": "Documentação da API Kixikila — gerada a partir dos controllers .NET"
+  },
+  "servers": [
+    { "url": "https://localhost:5000", "description": "Local" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "RegisterUserRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "phoneNumber": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["name", "phoneNumber", "password"]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "phoneNumber": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["phoneNumber", "password"]
+      },
+      "CreateUserByAdminRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "phoneNumber": { "type": "string" },
+          "role": { "type": "string" }
+        },
+        "required": ["name", "phoneNumber", "role"]
+      },
+      "UpdateUserRoleRequest": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string" }
+        },
+        "required": ["role"]
+      },
+      "AddMemberToGroupByAgentRequest": {
+        "type": "object",
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["memberId", "groupId"]
+      },
+      "InitiatePaymentRequest": {
+        "type": "object",
+        "properties": {
+          "amount": { "type": "number" },
+          "description": { "type": "string" }
+        },
+        "required": ["amount"]
+      },
+      "PaymentWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "reference": { "type": "string" },
+          "status": { "type": "string" },
+          "amount": { "type": "number" }
+        },
+        "required": ["reference", "status"]
+      },
+      "UssdSessionRequest": {
+        "type": "object",
+        "properties": {
+          "sessionId": { "type": "string" },
+          "phoneNumber": { "type": "string" },
+          "serviceCode": { "type": "string" },
+          "text": { "type": "string" }
+        },
+        "required": ["sessionId", "phoneNumber", "serviceCode", "text"]
+      },
+      "CreateGroupRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "contributionAmount": { "type": "number" },
+          "maxMembers": { "type": "integer" }
+        },
+        "required": ["name", "contributionAmount"]
+      },
+      "JoinGroupRequest": {
+        "type": "object",
+        "properties": {
+          "groupCode": { "type": "string" }
+        },
+        "required": ["groupCode"]
+      },
+      "RejectGroupJoinRequest": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string" }
+        }
+      },
+      "RegisterContributionRequest": {
+        "type": "object",
+        "properties": {
+          "cycleId": { "type": "string", "format": "uuid" },
+          "memberId": { "type": "string", "format": "uuid" },
+          "amount": { "type": "number" }
+        },
+        "required": ["cycleId", "memberId", "amount"]
+      },
+      "ApiResult": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "data": {}
+        }
+      }
+    }
+  },
+  "security": [{ "BearerAuth": [] }],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Regista um novo utilizador",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterUserRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Registo bem-sucedido" },
+          "400": { "description": "Dados inválidos" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Autentica e devolve token JWT",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Login bem-sucedido — devolve JWT" },
+          "401": { "description": "Credenciais inválidas" }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Devolve perfil do utilizador autenticado",
+        "responses": {
+          "200": { "description": "Perfil do utilizador" },
+          "404": { "description": "Utilizador não encontrado" }
+        }
+      }
+    },
+    "/api/users/me/score": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Devolve pontuação do utilizador autenticado",
+        "responses": {
+          "200": { "description": "Score do utilizador" },
+          "404": { "description": "Utilizador não encontrado" }
+        }
+      }
+    },
+    "/api/users/me/score-events/{eventType}": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Aplica evento de pontuação ao utilizador",
+        "x-policy": "CoordinatorsOrAdmins",
+        "parameters": [
+          { "name": "eventType", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Score atualizado" }
+        }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": ["Admin - Users"],
+        "summary": "Lista todos os utilizadores",
+        "x-policy": "AdminOnly",
+        "responses": { "200": { "description": "Lista de utilizadores" } }
+      },
+      "post": {
+        "tags": ["Admin - Users"],
+        "summary": "Cria utilizador pelo admin",
+        "x-policy": "AdminOnly",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateUserByAdminRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Utilizador criado" },
+          "400": { "description": "Dados inválidos" }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/role": {
+      "put": {
+        "tags": ["Admin - Users"],
+        "summary": "Atualiza role de um utilizador",
+        "x-policy": "AdminOnly",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateUserRoleRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Role atualizada" },
+          "400": { "description": "Operação inválida" }
+        }
+      }
+    },
+    "/api/agents/members": {
+      "post": {
+        "tags": ["Agents"],
+        "summary": "Agente cria um novo membro",
+        "x-policy": "AgentsOrAdmins",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterUserRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Membro criado" },
+          "400": { "description": "Dados inválidos" }
+        }
+      }
+    },
+    "/api/agents/members/add-to-group": {
+      "post": {
+        "tags": ["Agents"],
+        "summary": "Agente adiciona membro existente a um grupo",
+        "x-policy": "AgentsOrAdmins",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddMemberToGroupByAgentRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Membro adicionado ao grupo" },
+          "400": { "description": "Dados inválidos" }
+        }
+      }
+    },
+    "/api/payments/initiate": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Inicia um pagamento",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InitiatePaymentRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Pagamento iniciado" },
+          "400": { "description": "Dados inválidos" }
+        }
+      }
+    },
+    "/api/payments/{paymentId}": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "Obtém pagamento por ID",
+        "parameters": [
+          { "name": "paymentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Dados do pagamento" },
+          "404": { "description": "Pagamento não encontrado" }
+        }
+      }
+    },
+    "/api/payments/webhook/ussd404": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Webhook de confirmação USSD (público)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentWebhookRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Webhook processado" },
+          "400": { "description": "Payload inválido" }
+        }
+      }
+    },
+    "/api/ussd/session": {
+      "post": {
+        "tags": ["USSD"],
+        "summary": "Processa sessão USSD",
+        "description": "Aceita application/json, application/x-www-form-urlencoded ou multipart/form-data. Devolve texto plano.",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UssdSessionRequest" } },
+            "application/x-www-form-urlencoded": { "schema": { "$ref": "#/components/schemas/UssdSessionRequest" } },
+            "multipart/form-data": { "schema": { "$ref": "#/components/schemas/UssdSessionRequest" } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Resposta USSD em texto plano", "content": { "text/plain": { "schema": { "type": "string" } } } }
+        }
+      }
+    },
+    "/api/metrics/me": {
+      "get": {
+        "tags": ["Metrics"],
+        "summary": "Devolve métricas do utilizador autenticado",
+        "responses": {
+          "200": { "description": "Métricas do utilizador" },
+          "404": { "description": "Não encontrado" }
+        }
+      }
+    },
+    "/api/metrics/platform": {
+      "get": {
+        "tags": ["Metrics"],
+        "summary": "Devolve métricas globais da plataforma",
+        "x-policy": "AdminOnly",
+        "responses": {
+          "200": { "description": "Métricas da plataforma" }
+        }
+      }
+    },
+    "/api/riskanalysis/me": {
+      "get": {
+        "tags": ["Risk Analysis"],
+        "summary": "Análise de risco do utilizador autenticado",
+        "responses": { "200": { "description": "Resultado da análise de risco" } }
+      }
+    },
+    "/api/riskanalysis/by-phone": {
+      "get": {
+        "tags": ["Risk Analysis"],
+        "summary": "Análise de risco por número de telefone",
+        "x-policy": "CoordinatorsOrAdmins",
+        "parameters": [
+          { "name": "phoneNumber", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Resultado da análise" },
+          "404": { "description": "Utilizador não encontrado" }
+        }
+      }
+    },
+    "/api/groups": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Cria um grupo",
+        "x-policy": "AdminOnly",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateGroupRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Grupo criado" },
+          "400": { "description": "Dados inválidos" }
+        }
+      }
+    },
+    "/api/groups/join": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Utilizador entra num grupo",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JoinGroupRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Entrou no grupo" },
+          "400": { "description": "Código inválido ou grupo cheio" }
+        }
+      }
+    },
+    "/api/groups/{groupId}/join-requests": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Lista pedidos de entrada pendentes num grupo",
+        "x-policy": "CoordinatorsOrAdmins",
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Lista de pedidos pendentes" },
+          "404": { "description": "Grupo não encontrado" }
+        }
+      }
+    },
+    "/api/groups/join-requests/{requestId}/approve": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Aprova pedido de entrada num grupo",
+        "x-policy": "CoordinatorsOrAdmins",
+        "parameters": [
+          { "name": "requestId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Pedido aprovado" },
+          "400": { "description": "Operação inválida" }
+        }
+      }
+    },
+    "/api/groups/join-requests/{requestId}/reject": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Rejeita pedido de entrada num grupo",
+        "x-policy": "CoordinatorsOrAdmins",
+        "parameters": [
+          { "name": "requestId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RejectGroupJoinRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Pedido rejeitado" },
+          "400": { "description": "Operação inválida" }
+        }
+      }
+    },
+    "/api/groups/{groupId}": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Obtém detalhes de um grupo",
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Dados do grupo" },
+          "404": { "description": "Grupo não encontrado" }
+        }
+      }
+    },
+    "/api/groups/my": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Lista grupos do utilizador autenticado",
+        "responses": { "200": { "description": "Lista de grupos" } }
+      }
+    },
+    "/api/groups/{groupId}/leave": {
+      "delete": {
+        "tags": ["Groups"],
+        "summary": "Utilizador sai de um grupo",
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Saiu do grupo" },
+          "400": { "description": "Operação inválida" }
+        }
+      }
+    },
+    "/api/cycles/group/{groupId}/current": {
+      "get": {
+        "tags": ["Cycles"],
+        "summary": "Obtém ciclo atual de um grupo",
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Ciclo atual" },
+          "404": { "description": "Nenhum ciclo ativo" }
+        }
+      }
+    },
+    "/api/cycles/group/{groupId}/start": {
+      "post": {
+        "tags": ["Cycles"],
+        "summary": "Inicia próximo ciclo do grupo",
+        "x-policy": "CoordinatorsOrAdmins",
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Ciclo iniciado" },
+          "400": { "description": "Não foi possível iniciar ciclo" }
+        }
+      }
+    },
+    "/api/cycles/contribute": {
+      "post": {
+        "tags": ["Cycles"],
+        "summary": "Regista contribuição no ciclo",
+        "x-policy": "CoordinatorsOrAdmins",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterContributionRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Contribuição registada" },
+          "400": { "description": "Dados inválidos" }
+        }
+      }
+    },
+    "/api/cycles/{cycleId}/contributions": {
+      "get": {
+        "tags": ["Cycles"],
+        "summary": "Lista contribuições de um ciclo",
+        "parameters": [
+          { "name": "cycleId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Lista de contribuições" }
+        }
+      }
+    }
+  }
+}
