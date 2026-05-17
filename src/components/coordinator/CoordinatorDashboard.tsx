@@ -930,3 +930,351 @@ function AccoesRapidas({
     </div>
   );
 }
+
+
+import {
+  AlertCircle,
+  AlertTriangle,
+  Brain,
+  Search,
+  Target,
+} from "lucide-react";
+import { getMyRiskAnalysis, getRiskAnalysisByPhone } from "@/services";
+import type { RiskAnalysisResult } from "@/services";
+
+function getRiskColor(riskLevel: string): string {
+  const value = riskLevel.toLowerCase();
+
+  if (value.includes("baixo")) return "var(--green)";
+  if (value.includes("médio") || value.includes("medio")) return "var(--orange-mid)";
+
+  return "var(--red)";
+}
+
+function getRiskStatus(riskLevel: string): string {
+  const value = riskLevel.toLowerCase();
+
+  if (value.includes("baixo")) return "Aprovável";
+  if (value.includes("médio") || value.includes("medio")) return "Requer revisão";
+
+  return "Alto risco";
+}
+
+function getRiskIcon(riskLevel: string): LucideIcon {
+  const value = riskLevel.toLowerCase();
+
+  if (value.includes("baixo")) return CheckCircle;
+  if (value.includes("médio") || value.includes("medio")) return AlertTriangle;
+
+  return AlertCircle;
+}
+
+
+export function CoordinatorScoreView({ toast }: { toast: ToastFn }) {
+  const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysisResult | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [consultingByPhone, setConsultingByPhone] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const toastRef = useRef(toast);
+  const autoLoadedRef = useRef(false);
+  const loadingRef = useRef(false);
+  const myAnalysisLoadedRef = useRef(false);
+  const lastPhoneConsultedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
+
+  const loadMyRiskAnalysis = useCallback(async (force = false) => {
+    if (!force && myAnalysisLoadedRef.current) return;
+    if (loadingRef.current) return;
+
+    loadingRef.current = true;
+    setLoading(true);
+
+    try {
+      const data = await getMyRiskAnalysis();
+
+      setRiskAnalysis(data);
+      setConsultingByPhone(false);
+      myAnalysisLoadedRef.current = true;
+      lastPhoneConsultedRef.current = null;
+    } catch (error) {
+      setRiskAnalysis(null);
+      toastRef.current(
+        "erro",
+        getApiErrorMessage(error, "Não foi possível carregar a análise da IA"),
+      );
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []);
+
+  const loadRiskAnalysisByPhone = useCallback(
+    async (force = false) => {
+      const phone = phoneNumber.trim();
+
+      if (!phone) {
+        toastRef.current("aviso", "Informe o número de telefone");
+        return;
+      }
+
+      if (!force && lastPhoneConsultedRef.current === phone) return;
+      if (loadingRef.current) return;
+
+      loadingRef.current = true;
+      setLoading(true);
+
+      try {
+        const data = await getRiskAnalysisByPhone(phone);
+
+        setRiskAnalysis(data);
+        setConsultingByPhone(true);
+        lastPhoneConsultedRef.current = phone;
+
+        toastRef.current("sucesso", "Análise carregada com sucesso");
+      } catch (error) {
+        setRiskAnalysis(null);
+        toastRef.current(
+          "erro",
+          getApiErrorMessage(error, "Não foi possível consultar a análise por telefone"),
+        );
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [phoneNumber],
+  );
+
+  useEffect(() => {
+    if (autoLoadedRef.current) return;
+
+    autoLoadedRef.current = true;
+    loadMyRiskAnalysis();
+  }, [loadMyRiskAnalysis]);
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <Skeleton width={360} height={36} />
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="kx-card" style={{ padding: 20, height: 120 }}>
+              <Skeleton width="80%" height={16} />
+              <div style={{ marginTop: 8 }}>
+                <Skeleton width="60%" height={32} />
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <Skeleton width="40%" height={12} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Skeleton height={180} />
+        <Skeleton height={160} />
+      </div>
+    );
+  }
+
+  const riskColor = riskAnalysis ? getRiskColor(riskAnalysis.riskLevel) : "var(--ink-3)";
+  const RiskIcon = riskAnalysis ? getRiskIcon(riskAnalysis.riskLevel) : Brain;
+  const riskStatus = riskAnalysis ? getRiskStatus(riskAnalysis.riskLevel) : "Indisponível";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1 className="kx-display" style={{ fontSize: 26 }}>
+            Score IA · Inteligência de Crédito
+          </h1>
+
+          <p style={{ color: "var(--ink-3)", fontSize: 14, marginTop: 4 }}>
+            Consulte a análise de risco do coordenador ou pesquise por número de telefone.
+          </p>
+        </div>
+
+        <button onClick={() => loadMyRiskAnalysis(true)} className="kx-btn kx-btn-outline">
+          <RefreshCw size={14} /> Minha análise
+        </button>
+      </div>
+
+      <div
+        className="kx-card"
+        style={{
+          padding: 20,
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 260, position: "relative" }}>
+          <Search
+            size={16}
+            style={{
+              position: "absolute",
+              left: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--ink-3)",
+            }}
+          />
+
+          <input
+            className="kx-input"
+            placeholder="Consultar por telefone. Ex: 923456789"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") loadRiskAnalysisByPhone(true);
+            }}
+            style={{ paddingLeft: 40 }}
+          />
+        </div>
+
+        <button onClick={() => loadRiskAnalysisByPhone(true)} className="kx-btn kx-btn-primary">
+          <Search size={14} /> Consultar
+        </button>
+      </div>
+
+      {!riskAnalysis ? (
+        <EmptyState message="API de Score IA não disponível" icon={Brain} />
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: -6 }}>
+            {consultingByPhone
+              ? "Resultado da consulta por número de telefone"
+              : "Resultado da análise do utilizador autenticado"}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+            <KpiCard
+              Icon={Brain}
+              label="Motor de análise"
+              valor="IA"
+              sub="Avaliação automática"
+              cor="var(--brand)"
+              bg="var(--brand-light)"
+            />
+
+            <KpiCard
+              Icon={RiskIcon}
+              label="Nível de risco"
+              valor={riskAnalysis.riskLevel}
+              sub="Classificação actual"
+              cor={riskColor}
+              bg="var(--surface-2)"
+            />
+
+            <KpiCard
+              Icon={Target}
+              label="Estado"
+              valor={riskStatus}
+              sub="Decisão sugerida"
+              cor={riskColor}
+              bg="var(--surface-2)"
+            />
+          </div>
+
+          <div className="kx-card" style={{ padding: 24 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: "var(--surface-2)",
+                  color: riskColor,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <RiskIcon size={20} />
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--ink-3)",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Recomendação da IA
+                </div>
+
+                <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>
+                  Orientação para decisão de crédito
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: 18,
+                borderRadius: 14,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-soft)",
+                fontSize: 14,
+                color: "var(--ink-2)",
+                lineHeight: 1.6,
+              }}
+            >
+              {riskAnalysis.recommendation}
+            </div>
+          </div>
+
+          <div className="kx-card" style={{ padding: 24 }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--ink-3)",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                marginBottom: 12,
+              }}
+            >
+              Motivo da análise
+            </div>
+
+            <div
+              style={{
+                padding: 18,
+                borderRadius: 14,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-soft)",
+                fontSize: 14,
+                color: "var(--ink-2)",
+                lineHeight: 1.6,
+              }}
+            >
+              {riskAnalysis.reason}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

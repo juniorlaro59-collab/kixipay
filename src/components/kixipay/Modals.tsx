@@ -15,10 +15,12 @@ export function AuthModal({
   open,
   onClose,
   onLogin,
+  toast,
 }: {
   open: boolean;
   onClose: () => void;
   onLogin: (result: LoginResult) => void;
+  toast?: (tipo: "sucesso" | "aviso" | "erro" | "info", mensagem: string) => void;
 }) {
   const [tab, setTab] = useState<"entrar" | "criar">("entrar");
   const [loading, setLoading] = useState(false);
@@ -54,10 +56,13 @@ export function AuthModal({
   try {
     const result = await login(data.telefone, data.pin);
     onLogin(result);
-  } catch (err) {
-    const msg = getApiErrorMessage(err, "Não foi possível iniciar sessão");
-    console.error("[LOGIN ERROR]", msg);
-    loginForm.setError("root", { message: msg });
+} catch (err) {
+  const msg = getApiErrorMessage(err, "Não foi possível iniciar sessão");
+
+  console.error("[LOGIN ERROR]", msg);
+
+  loginForm.setError("root", { message: msg });
+  toast?.("erro", msg);
   } finally {
     authRequestRef.current = false;
     setLoading(false);
@@ -77,9 +82,12 @@ const handleRegister = async (data: RegisterFormData) => {
     const result = await register(data.nome, data.telefone, data.pin, data.biNumber);
     onLogin(result);
   } catch (err) {
-    const msg = getApiErrorMessage(err, "Não foi possível criar conta");
-    console.error("[REGISTER ERROR]", msg);
-    registerForm.setError("root", { message: msg });
+  const msg = getApiErrorMessage(err, "Não foi possível criar conta");
+
+  console.error("[REGISTER ERROR]", msg);
+
+  registerForm.setError("root", { message: msg });
+  toast?.("erro", msg);
   } finally {
     authRequestRef.current = false;
     setLoading(false);

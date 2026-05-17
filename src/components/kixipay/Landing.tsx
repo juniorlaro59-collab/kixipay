@@ -1160,7 +1160,7 @@ export function PlanosLanding({ onAuth }: { onAuth: () => void }) {
       destaque: false,
       badge: "Para instituições",
       items: ["API KixiScore", "Dashboard analítico", "Relatórios em massa", "SLA 99.9%"],
-      cta: "Falar com equipa",
+      cta: "Indisponível",
     },
   ];
   return (

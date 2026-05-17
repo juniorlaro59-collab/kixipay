@@ -143,7 +143,12 @@ function normalizeRole(role: string): UserRole {
     return (
       <>
         <Landing onAuth={() => setModal("auth")} />
-        <AuthModal open={modal === "auth"} onClose={() => setModal(null)} onLogin={handleLogin} />
+        <AuthModal
+  open={modal === "auth"}
+  onClose={() => setModal(null)}
+  onLogin={handleLogin}
+  toast={pushToast}
+/>
         <ToastContainer toasts={toasts} onClose={closeToast} />
       </>
     );

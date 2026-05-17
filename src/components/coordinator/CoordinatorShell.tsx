@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Home,
   Users,
@@ -11,17 +11,24 @@ import {
   MessageSquare,
   Trash2,
   Plus,
+  RefreshCw,
 } from "lucide-react";
+
 import { Avatar, MiniScoreBar, StatusBadge } from "@/components/kixipay/shared";
 import { fmtKz } from "@/components/kixipay/data";
 import type { Membro } from "@/components/kixipay/data";
 import { AppLayout, type NavItem, type ToastFn } from "@/components/shared/AppLayout";
-import { CoordinatorDashboard } from "./CoordinatorDashboard";
-import { KixiScoreView } from "@/components/shared/ScoreView";
+
+import { CoordinatorDashboard, CoordinatorScoreView } from "@/components/coordinator/CoordinatorDashboard";
+
 import { HistoricoView } from "@/components/shared/HistoricoView";
 import { ConfigView } from "@/components/shared/ConfigView";
 
+import { getUsersByRole } from "@/services";
+import { getApiErrorMessage } from "@/services/client";
+
 type ViewName = "dashboard" | "membros" | "score" | "ussd" | "historico" | "config";
+
 type ModalOpener = (
   m: "contribuicao" | "addMembro" | "confirmarPagamento" | "recomendacao",
   data?: Membro,
@@ -63,10 +70,17 @@ export function CoordinatorShell({
       {view === "dashboard" && (
         <CoordinatorDashboard user={user} openModal={openModal} toast={toast} />
       )}
-      {view === "membros" && <MembrosView openDrawer={openDrawer} openModal={openModal} />}
-      {view === "score" && <KixiScoreView user={user} toast={toast} />}
+
+      {view === "membros" && (
+        <MembrosView openDrawer={openDrawer} openModal={openModal} toast={toast} />
+      )}
+
+      {view === "score" && <CoordinatorScoreView toast={toast} />}
+
       {view === "ussd" && <UssdView />}
+
       {view === "historico" && <HistoricoView />}
+
       {view === "config" && <ConfigView toast={toast} />}
     </AppLayout>
   );
@@ -75,9 +89,11 @@ export function CoordinatorShell({
 function MembrosView({
   openDrawer,
   openModal,
+  toast,
 }: {
   openDrawer: (m: Membro) => void;
   openModal: ModalOpener;
+  toast: ToastFn;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"todos" | "Pago" | "Pendente" | "Em atraso">("todos");
@@ -85,16 +101,46 @@ function MembrosView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const alreadyLoadedRef = useRef(false);
+  const loadingRef = useRef(false);
+  const errorShownRef = useRef(false);
+
+  const loadMembers = useCallback(
+    async (force = false) => {
+      if (!force && alreadyLoadedRef.current) return;
+      if (loadingRef.current) return;
+
+      loadingRef.current = true;
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await getUsersByRole("member", 1, 50);
+
+        setMembros(response.membros);
+        alreadyLoadedRef.current = true;
+        errorShownRef.current = false;
+      } catch (err) {
+        const msg = getApiErrorMessage(err, "Erro ao carregar membros");
+
+        setError(msg);
+
+        if (!errorShownRef.current) {
+          errorShownRef.current = true;
+          toast("erro", msg);
+        }
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [toast],
+  );
+
   useEffect(() => {
-    setLoading(true);
-    setError("");
-    import("@/services").then(({ getUsersByRole }) =>
-      getUsersByRole("member", 1, 50)
-        .then((r) => setMembros(r.membros))
-        .catch(() => setError("Erro ao carregar membros"))
-        .finally(() => setLoading(false)),
-    );
-  }, []);
+    loadMembers();
+  }, [loadMembers]);
+
   const filtered = useMemo(
     () =>
       membros.filter(
@@ -104,6 +150,7 @@ function MembrosView({
       ),
     [search, filter, membros],
   );
+
   return (
     <div>
       <div
@@ -119,10 +166,18 @@ function MembrosView({
         <h1 className="kx-display" style={{ fontSize: 26 }}>
           {membros.length} membros
         </h1>
-        <button onClick={() => openModal("addMembro")} className="kx-btn kx-btn-primary">
-          <Plus size={14} /> Adicionar membro
-        </button>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={() => loadMembers(true)} className="kx-btn kx-btn-outline">
+            <RefreshCw size={14} /> Actualizar
+          </button>
+
+          <button onClick={() => openModal("addMembro")} className="kx-btn kx-btn-primary">
+            <Plus size={14} /> Adicionar membro
+          </button>
+        </div>
       </div>
+
       <div
         style={{
           display: "flex",
@@ -143,6 +198,7 @@ function MembrosView({
               color: "var(--ink-3)",
             }}
           />
+
           <input
             className="kx-input"
             placeholder="Pesquisar membro..."
@@ -151,6 +207,7 @@ function MembrosView({
             style={{ paddingLeft: 40 }}
           />
         </div>
+
         <div style={{ display: "flex", gap: 6 }}>
           {(["todos", "Pago", "Pendente", "Em atraso"] as const).map((f) => (
             <button
@@ -169,6 +226,7 @@ function MembrosView({
           ))}
         </div>
       </div>
+
       {loading ? (
         <div className="kx-card" style={{ padding: 20, color: "var(--ink-3)", fontSize: 13 }}>
           A carregar membros...
@@ -178,87 +236,119 @@ function MembrosView({
           {error}
         </div>
       ) : (
-      <div className="kx-card" style={{ overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "var(--surface-2)", textAlign: "left" }}>
-                {[
-                  "#",
-                  "Membro",
-                  "Telemóvel",
-                  "Pos.",
-                  "Total Poupado",
-                  "KixiScore",
-                  "Status Maio",
-                  "Acções",
-                ].map((h) => (
-                  <th
-                    key={h}
+        <div className="kx-card" style={{ overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "var(--surface-2)", textAlign: "left" }}>
+                  {[
+                    "#",
+                    "Membro",
+                    "Telemóvel",
+                    "Pos.",
+                    "Total Poupado",
+                    "KixiScore",
+                    "Status Maio",
+                    "Acções",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "12px 14px",
+                        fontWeight: 600,
+                        color: "var(--ink-3)",
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {filtered.map((m, i) => (
+                  <tr
+                    key={m.id}
+                    onClick={() => openDrawer(m)}
                     style={{
-                      padding: "12px 14px",
-                      fontWeight: 600,
-                      color: "var(--ink-3)",
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.4,
+                      borderTop: "1px solid var(--border-soft)",
+                      cursor: "pointer",
+                      background: i % 2 === 0 ? "transparent" : "var(--surface)",
                     }}
                   >
-                    {h}
-                  </th>
+                    <td style={{ padding: 14, color: "var(--ink-3)" }}>{i + 1}</td>
+
+                    <td style={{ padding: 14 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <Avatar iniciais={m.iniciais} cor={m.cor} size={32} />
+                        <span style={{ fontWeight: 600 }}>{m.nome}</span>
+                      </div>
+                    </td>
+
+                    <td style={{ padding: 14, color: "var(--ink-2)" }}>{m.tel}</td>
+
+                    <td style={{ padding: 14 }} className="kx-num">
+                      {m.posicao}
+                    </td>
+
+                    <td style={{ padding: 14 }} className="kx-num">
+                      {fmtKz(m.totalPoupado)}
+                    </td>
+
+                    <td style={{ padding: 14 }}>
+                      <MiniScoreBar score={m.score} />
+                    </td>
+
+                    <td style={{ padding: 14 }}>
+                      <StatusBadge status={m.status} />
+                    </td>
+
+                    <td style={{ padding: 14 }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: "flex", gap: 6, color: "var(--ink-3)" }}>
+                        <button onClick={() => openDrawer(m)} aria-label="Ver">
+                          <Eye size={16} />
+                        </button>
+
+                        <button
+                          aria-label="Mensagem"
+                          onClick={() => toast("info", `Mensagem para ${m.nome}`)}
+                        >
+                          <MessageSquare size={16} />
+                        </button>
+
+                        <button
+                          aria-label="Remover"
+                          onClick={() => toast("aviso", "Remoção de membro ainda não implementada")}
+                          style={{ color: "var(--red)" }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((m, i) => (
-                <tr
-                  key={m.id}
-                  onClick={() => openDrawer(m)}
-                  style={{
-                    borderTop: "1px solid var(--border-soft)",
-                    cursor: "pointer",
-                    background: i % 2 === 0 ? "transparent" : "var(--surface)",
-                  }}
-                >
-                  <td style={{ padding: 14, color: "var(--ink-3)" }}>{i + 1}</td>
-                  <td style={{ padding: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <Avatar iniciais={m.iniciais} cor={m.cor} size={32} />
-                      <span style={{ fontWeight: 600 }}>{m.nome}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: 14, color: "var(--ink-2)" }}>{m.tel}</td>
-                  <td style={{ padding: 14 }} className="kx-num">
-                    {m.posicao}
-                  </td>
-                  <td style={{ padding: 14 }} className="kx-num">
-                    {fmtKz(m.totalPoupado)}
-                  </td>
-                  <td style={{ padding: 14 }}>
-                    <MiniScoreBar score={m.score} />
-                  </td>
-                  <td style={{ padding: 14 }}>
-                    <StatusBadge status={m.status} />
-                  </td>
-                  <td style={{ padding: 14 }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: "flex", gap: 6, color: "var(--ink-3)" }}>
-                      <button onClick={() => openDrawer(m)} aria-label="Ver">
-                        <Eye size={16} />
-                      </button>
-                      <button aria-label="Mensagem">
-                        <MessageSquare size={16} />
-                      </button>
-                      <button aria-label="Remover">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+                {filtered.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      style={{
+                        padding: 24,
+                        textAlign: "center",
+                        color: "var(--ink-3)",
+                      }}
+                    >
+                      Nenhum membro encontrado
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );
@@ -266,11 +356,13 @@ function MembrosView({
 
 function UssdView() {
   const [screen, setScreen] = useState(0);
+
   return (
     <div>
       <h1 className="kx-display" style={{ fontSize: 26, marginBottom: 20 }}>
         USSD · Para todos os telemóveis
       </h1>
+
       <div
         style={{
           display: "grid",
@@ -282,18 +374,22 @@ function UssdView() {
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
           <FeaturePhoneSim screen={screen} onScreen={setScreen} />
+
           <span className="kx-pill">Ecrã {screen + 1} de 4</span>
         </div>
+
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="kx-card" style={{ padding: 24 }}>
             <h3 className="kx-display" style={{ fontSize: 20, marginBottom: 8 }}>
               Para quem não tem smartphone
             </h3>
+
             <p style={{ color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
               Cada membro pode contribuir, consultar saldo e ver o seu KixiScore directamente do
               feature phone — sem internet.
             </p>
           </div>
+
           <div className="kx-card" style={{ padding: 24, background: "var(--brand-light)" }}>
             <div
               style={{
@@ -305,18 +401,22 @@ function UssdView() {
             >
               Como activar
             </div>
+
             <div className="kx-mono" style={{ fontSize: 24, marginTop: 6, color: "var(--brand)" }}>
               *920*55#
             </div>
+
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <span className="kx-pill" style={{ background: "var(--card)" }}>
                 Unitel
               </span>
+
               <span className="kx-pill" style={{ background: "var(--card)" }}>
                 Angola Telecom
               </span>
             </div>
           </div>
+
           <div className="kx-card" style={{ padding: 20 }}>
             <div
               style={{
@@ -329,6 +429,7 @@ function UssdView() {
             >
               Fluxo USSD
             </div>
+
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {["Menu", "Pagar", "Confirmar", "Score"].map((s, i, arr) => (
                 <span key={s} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -343,11 +444,13 @@ function UssdView() {
                   >
                     {i + 1}. {s}
                   </span>
+
                   {i < arr.length - 1 && <span style={{ color: "var(--ink-4)" }}>→</span>}
                 </span>
               ))}
             </div>
           </div>
+
           <div className="kx-card" style={{ padding: 20, background: "var(--surface)" }}>
             <div
               style={{
@@ -360,6 +463,7 @@ function UssdView() {
             >
               SMS automático
             </div>
+
             <div
               className="kx-mono"
               style={{
@@ -377,7 +481,14 @@ function UssdView() {
           </div>
         </div>
       </div>
-      <style>{`@media (max-width: 900px) { .kx-ussd-app { grid-template-columns: 1fr !important; } }`}</style>
+
+      <style>{`
+        @media (max-width: 900px) {
+          .kx-ussd-app {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -389,7 +500,9 @@ function FeaturePhoneSim({ screen, onScreen }: { screen: number; onScreen: (s: n
     { lines: ["PIN:", "", "* * * *", "", "→ OK"], sel: 2 },
     { lines: ["Pagamento OK!", "", "KixiScore +5", "", "Saldo: 185.000"], sel: -1 },
   ];
+
   const s = screens[screen];
+
   return (
     <div
       style={{
@@ -406,6 +519,7 @@ function FeaturePhoneSim({ screen, onScreen }: { screen: number; onScreen: (s: n
       <div style={{ fontSize: 10, textAlign: "center", color: "#666", marginBottom: 20 }}>
         {["Unitel", "Angola Telecom"][screen % 2]}
       </div>
+
       <div
         style={{
           flex: 1,
@@ -435,6 +549,7 @@ function FeaturePhoneSim({ screen, onScreen }: { screen: number; onScreen: (s: n
           </div>
         ))}
       </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20 }}>
         <button
           onClick={() => onScreen(Math.max(0, screen - 1))}
@@ -448,6 +563,7 @@ function FeaturePhoneSim({ screen, onScreen }: { screen: number; onScreen: (s: n
         >
           ▲ Voltar
         </button>
+
         <button
           onClick={() => onScreen(Math.min(3, screen + 1))}
           style={{
