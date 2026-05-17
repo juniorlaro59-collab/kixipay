@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Modal, Avatar, GeoQR, Logo } from "./shared";
+import { Modal, GeoQR, Logo } from "./shared";
 import { fmtKz, eligivel, scoreLabel } from "./data";
 import type { Membro } from "./data";
 import { Check, Copy, User, Smartphone, LogIn, UserPlus, Shield, Eye, EyeOff } from "lucide-react";
@@ -9,14 +9,7 @@ import { loginSchema, registerSchema } from "@/lib/validations";
 import type { LoginFormData, RegisterFormData } from "@/lib/validations";
 import { login, register } from "@/services";
 import type { LoginResult } from "@/services";
-
-function getFriendlyAuthError(error: unknown) {
-  const message = error instanceof Error ? error.message : "Erro desconhecido";
-  if (/timeout of \d+ms exceeded/i.test(message)) {
-    return "Nao foi possivel contactar o servidor. Verifique a ligacao e tente novamente.";
-  }
-  return message;
-}
+import { getApiErrorMessage } from "@/services/client";
 
 export function AuthModal({
   open,
@@ -40,46 +33,59 @@ export function AuthModal({
 
   const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { nome: "", telefone: "", pin: "", pinConfirm: "", termos: true },
+    defaultValues: {
+      nome: "",
+      telefone: "",
+      biNumber: "",
+      pin: "",
+      pinConfirm: "",
+      termos: true,
+    },
   });
 
-  const handleLogin = async (data: LoginFormData) => {
-    if (authRequestRef.current) return;
-    authRequestRef.current = true;
-    setLoading(true);
-    setLoadingMsg("A verificar credenciais...");
-    try {
-      const result = await login(data.telefone, data.pin);
-      onLogin(result);
-    } catch (err) {
-      const msg = getFriendlyAuthError(err);
-      console.error("[LOGIN ERROR]", msg);
-      loginForm.setError("root", { message: msg });
-    } finally {
-      authRequestRef.current = false;
-      setLoading(false);
-      setLoadingMsg("");
-    }
-  };
+ const handleLogin = async (data: LoginFormData) => {
+  if (authRequestRef.current) return;
 
-  const handleRegister = async (data: RegisterFormData) => {
-    if (authRequestRef.current) return;
-    authRequestRef.current = true;
-    setLoading(true);
-    setLoadingMsg("A criar conta...");
-    try {
-      const result = await register(data.nome, data.telefone, data.pin);
-      onLogin(result);
-    } catch (err) {
-      const msg = getFriendlyAuthError(err);
-      console.error("[REGISTER ERROR]", msg);
-      registerForm.setError("root", { message: msg });
-    } finally {
-      authRequestRef.current = false;
-      setLoading(false);
-      setLoadingMsg("");
-    }
-  };
+  authRequestRef.current = true;
+  setLoading(true);
+  setLoadingMsg("A verificar credenciais...");
+  loginForm.clearErrors("root");
+
+  try {
+    const result = await login(data.telefone, data.pin);
+    onLogin(result);
+  } catch (err) {
+    const msg = getApiErrorMessage(err, "Não foi possível iniciar sessão");
+    console.error("[LOGIN ERROR]", msg);
+    loginForm.setError("root", { message: msg });
+  } finally {
+    authRequestRef.current = false;
+    setLoading(false);
+    setLoadingMsg("");
+  }
+};
+
+const handleRegister = async (data: RegisterFormData) => {
+  if (authRequestRef.current) return;
+
+  authRequestRef.current = true;
+  setLoading(true);
+  setLoadingMsg("A criar conta...");
+  registerForm.clearErrors("root");
+
+  try {
+    const result = await register(data.nome, data.telefone, data.pin, data.biNumber);
+    onLogin(result);
+  } catch (err) {
+    const msg = getApiErrorMessage(err, "Não foi possível criar conta");
+    console.error("[REGISTER ERROR]", msg);
+    registerForm.setError("root", { message: msg });
+  } finally {
+    authRequestRef.current = false;
+    setLoading(false);
+    setLoadingMsg("");
+  }
+};
 
   const FormField = ({
     label,
@@ -139,7 +145,13 @@ export function AuthModal({
   }) => (
     <button
       type="button"
-      onClick={() => setTab(id)}
+      disabled={loading}
+      onClick={() => {
+        if (loading) return;
+        setTab(id);
+        loginForm.clearErrors();
+        registerForm.clearErrors();
+      }}
       style={{
         flex: 1,
         display: "flex",
@@ -155,6 +167,7 @@ export function AuthModal({
         color: tab === id ? "var(--ink)" : "var(--ink-3)",
         boxShadow: tab === id ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
         transition: "all 200ms",
+        opacity: loading ? 0.7 : 1,
       }}
     >
       <Icon size={18} color={tab === id ? "var(--brand)" : "var(--ink-3)"} />
@@ -228,6 +241,7 @@ export function AuthModal({
                   className="kx-input"
                   style={{ border: "none", borderRadius: 0 }}
                   placeholder="9XX XXX XXX"
+                  disabled={loading}
                   {...loginForm.register("telefone")}
                 />
               </div>
@@ -240,12 +254,20 @@ export function AuthModal({
                   style={{ paddingRight: 44 }}
                   type={showPin ? "text" : "password"}
                   placeholder="Mínimo 4 caracteres"
+                  disabled={loading}
                   {...loginForm.register("pin")}
                 />
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => setShowPin(!showPin)}
-                  style={{ position: "absolute", right: 12, top: 10, color: "var(--ink-3)" }}
+                  style={{
+                    position: "absolute",
+                    right: 12,
+                    top: 10,
+                    color: "var(--ink-3)",
+                    opacity: loading ? 0.5 : 1,
+                  }}
                 >
                   {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -256,7 +278,7 @@ export function AuthModal({
               type="submit"
               disabled={loading}
               className="kx-btn kx-btn-primary"
-              style={{ width: "100%", height: 50, fontSize: 15, marginTop: 4 }}
+              style={{ width: "100%", height: 50, fontSize: 15, marginTop: 4, opacity: loading ? 0.7 : 1 }}
             >
               {loading ? loadingMsg : "Entrar no KixiPay"}
             </button>
@@ -278,6 +300,7 @@ export function AuthModal({
                   className="kx-input"
                   placeholder="Ex: Maria João"
                   style={{ paddingLeft: 40 }}
+                  disabled={loading}
                   {...registerForm.register("nome")}
                 />
               </div>
@@ -293,9 +316,20 @@ export function AuthModal({
                   className="kx-input"
                   placeholder="+244 9XX XXX XXX"
                   style={{ paddingLeft: 40 }}
+                  disabled={loading}
                   {...registerForm.register("telefone")}
                 />
               </div>
+            </FormField>
+
+            <FormField label="Número do BI" error={registerForm.formState.errors.biNumber?.message}>
+              <input
+                className="kx-input"
+                placeholder="Ex: 000000000LA000"
+                style={{ textTransform: "uppercase" }}
+                disabled={loading}
+                {...registerForm.register("biNumber")}
+              />
             </FormField>
 
             <FormField label="Criar senha" error={registerForm.formState.errors.pin?.message}>
@@ -303,6 +337,7 @@ export function AuthModal({
                 className="kx-input"
                 type="password"
                 placeholder="Mínimo 4 caracteres"
+                disabled={loading}
                 {...registerForm.register("pin")}
               />
             </FormField>
@@ -315,6 +350,7 @@ export function AuthModal({
                 className="kx-input"
                 type="password"
                 placeholder="Repetir senha"
+                disabled={loading}
                 {...registerForm.register("pinConfirm")}
               />
             </FormField>
@@ -327,12 +363,14 @@ export function AuthModal({
                   gap: 10,
                   fontSize: 13,
                   color: "var(--ink-2)",
-                  cursor: "pointer",
+                  cursor: loading ? "not-allowed" : "pointer",
                   padding: "6px 0",
+                  opacity: loading ? 0.7 : 1,
                 }}
               >
                 <input
                   type="checkbox"
+                  disabled={loading}
                   {...registerForm.register("termos")}
                   style={{ width: 18, height: 18, accentColor: "var(--brand)" }}
                 />
@@ -352,7 +390,7 @@ export function AuthModal({
               type="submit"
               disabled={loading}
               className="kx-btn kx-btn-primary"
-              style={{ width: "100%", height: 50, fontSize: 15, marginTop: 4 }}
+              style={{ width: "100%", height: 50, fontSize: 15, marginTop: 4, opacity: loading ? 0.7 : 1 }}
             >
               {loading ? loadingMsg : "Criar conta grátis"}
             </button>
@@ -392,25 +430,39 @@ export function ContribuicaoModal({
   const [loading, setLoading] = useState(false);
   const [ref, setRef] = useState("");
   const [error, setError] = useState("");
+  const contributionRequestRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (contributionRequestRef.current) return;
+
     if (!ref.trim()) {
       setError("Indique a referência da transferência");
       return;
     }
+
+    contributionRequestRef.current = true;
     setLoading(true);
     setError("");
+
     try {
-      const { getGrupo, getCurrentCycle, contributeToCycle } = await import("@/services");
+      const { getGrupo, getCurrentCycle, registerContribution } = await import("@/services");
+
       const grupo = await getGrupo();
       const cycle = await getCurrentCycle(grupo.id);
-      const result = await contributeToCycle(cycle.id, ref.trim());
-      onConfirm(result.message || "Contribuição registada com sucesso ✓");
+
+      await registerContribution({
+        cycleId: cycle.id,
+        transactionReference: ref.trim(),
+      });
+
+      setRef("");
+      onConfirm("Contribuição registada com sucesso ✓");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao registar contribuição";
-      setError(msg);
+      setError(getApiErrorMessage(err, "Erro ao registar contribuição"));
     } finally {
+      contributionRequestRef.current = false;
       setLoading(false);
     }
   };
@@ -421,6 +473,7 @@ export function ContribuicaoModal({
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 20 }}>
           Registar Contribuição
         </h2>
+
         {error && (
           <div
             style={{
@@ -437,28 +490,34 @@ export function ContribuicaoModal({
             {error}
           </div>
         )}
+
         <label style={{ fontSize: 13, fontWeight: 600 }}>Referência da transferência</label>
+
         <input
           value={ref}
           onChange={(e) => setRef(e.target.value)}
           className="kx-input kx-mono"
           placeholder="Ex: TRF-202605-001"
+          disabled={loading}
           style={{ marginTop: 6, marginBottom: 20 }}
         />
+
         <div style={{ display: "flex", gap: 10 }}>
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             className="kx-btn kx-btn-outline"
-            style={{ flex: 1 }}
+            style={{ flex: 1, opacity: loading ? 0.5 : 1 }}
           >
             Cancelar
           </button>
+
           <button
             type="submit"
             disabled={loading}
             className="kx-btn kx-btn-primary"
-            style={{ flex: 1 }}
+            style={{ flex: 1, opacity: loading ? 0.7 : 1 }}
           >
             {loading ? "A registar..." : "Confirmar pagamento"}
           </button>
@@ -480,24 +539,45 @@ export function AddMembroModal({
   const [loading, setLoading] = useState(false);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [biNumber, setBiNumber] = useState("");
   const [error, setError] = useState("");
+  const addMemberRequestRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !telefone.trim()) {
-      setError("Preencha nome e telefone");
+
+    if (addMemberRequestRef.current) return;
+
+    if (!nome.trim() || !telefone.trim() || !biNumber.trim()) {
+      setError("Preencha nome, telefone e BI");
       return;
     }
+
+    addMemberRequestRef.current = true;
     setLoading(true);
     setError("");
+
     try {
       const { cadastrarMembro } = await import("@/services");
-      await cadastrarMembro({ nome: nome.trim(), telefone: telefone.trim(), regiao: "" });
-      onConfirm(`${nome} cadastrado com sucesso ✓`);
+
+      await cadastrarMembro({
+        nome: nome.trim(),
+        telefone: telefone.trim(),
+        biNumber: biNumber.trim().toUpperCase(),
+        regiao: "",
+      });
+
+      const nomeCriado = nome.trim();
+
+      setNome("");
+      setTelefone("");
+      setBiNumber("");
+
+      onConfirm(`${nomeCriado} cadastrado com sucesso ✓`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao cadastrar membro";
-      setError(msg);
+      setError(getApiErrorMessage(err, "Erro ao cadastrar membro"));
     } finally {
+      addMemberRequestRef.current = false;
       setLoading(false);
     }
   };
@@ -508,6 +588,7 @@ export function AddMembroModal({
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 20 }}>
           Adicionar membro ao grupo
         </h2>
+
         {error && (
           <div
             style={{
@@ -524,34 +605,50 @@ export function AddMembroModal({
             {error}
           </div>
         )}
+
         <input
           value={nome}
           onChange={(e) => setNome(e.target.value)}
           className="kx-input"
           placeholder="Nome completo"
+          disabled={loading}
           style={{ marginBottom: 12 }}
         />
+
         <input
           value={telefone}
           onChange={(e) => setTelefone(e.target.value)}
           className="kx-input"
           placeholder="+244 9XX XXX XXX"
+          disabled={loading}
           style={{ marginBottom: 12 }}
         />
+
+        <input
+          value={biNumber}
+          onChange={(e) => setBiNumber(e.target.value.toUpperCase())}
+          className="kx-input"
+          placeholder="BI: 000000000LA000"
+          disabled={loading}
+          style={{ marginBottom: 12, textTransform: "uppercase" }}
+        />
+
         <div style={{ display: "flex", gap: 10 }}>
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             className="kx-btn kx-btn-outline"
-            style={{ flex: 1 }}
+            style={{ flex: 1, opacity: loading ? 0.5 : 1 }}
           >
             Cancelar
           </button>
+
           <button
             type="submit"
             disabled={loading}
             className="kx-btn kx-btn-primary"
-            style={{ flex: 1 }}
+            style={{ flex: 1, opacity: loading ? 0.7 : 1 }}
           >
             {loading ? "A cadastrar..." : "Adicionar ao grupo"}
           </button>
@@ -604,22 +701,28 @@ export function RecomendacaoModal({
   onSend: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+
   if (!membro) return null;
+
   const el = eligivel(membro.score);
   const code = `KXP-VRFC-${membro.score}-2026-${membro.iniciais}`;
+
   return (
     <Modal open={open} onClose={onClose}>
       <div style={{ padding: 32 }}>
         <h2 className="kx-display" style={{ fontSize: 22, marginBottom: 4 }}>
           Relatório de Elegibilidade
         </h2>
+
         <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 20 }}>{membro.nome}</p>
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
           <Stat label="KixiScore" valor={String(membro.score)} cor="var(--gold)" />
           <Stat label="Nível" valor={scoreLabel(membro.score)} />
           <Stat label="Meses" valor={String(membro.meses)} />
           <Stat label="Pontualidade" valor={`${membro.pontualidade}%`} cor="var(--green)" />
         </div>
+
         <div
           style={{
             background: "var(--blue-light)",
@@ -641,9 +744,11 @@ export function RecomendacaoModal({
             </div>
           )}
         </div>
+
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
           <GeoQR seed={code} />
         </div>
+
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
           <code
             className="kx-mono"
@@ -658,6 +763,7 @@ export function RecomendacaoModal({
           >
             {code}
           </code>
+
           <button
             className="kx-btn kx-btn-outline kx-btn-sm"
             onClick={() => {
@@ -669,12 +775,14 @@ export function RecomendacaoModal({
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
         </div>
+
         <select className="kx-input" style={{ marginBottom: 14 }}>
           <option>BFA</option>
           <option>Atlântico</option>
           <option>BAI</option>
           <option>SOL</option>
         </select>
+
         <button
           onClick={onSend}
           className="kx-btn kx-btn-blue"

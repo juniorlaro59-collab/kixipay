@@ -1,62 +1,84 @@
-import { post, setToken } from "./client";
-import type { UserRole, UserId, ApiLoginResponse } from "@/types";
+import { get, post, setToken, clearToken } from "./client";
+import { normalizeAngolaPhone } from "./helpers";
+
+export interface AuthApiUser {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  biNumber?: string;
+  score: number;
+  level: string;
+  role: string;
+  pendingDebt: number;
+}
+
+export interface AuthApiResponse {
+  token: string;
+  user: AuthApiUser;
+}
 
 export interface LoginResult {
-  userId: UserId;
-  nome: string;
-  role: UserRole;
   token: string;
+  userId: string;
+  nome: string;
+  role: string;
 }
 
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("244")) return `+${digits}`;
-  return `+244${digits}`;
+export interface ApiUser {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  biNumber?: string;
+  score: number;
+  level: string;
+  role: string;
+  pendingDebt: number;
 }
 
-export async function login(telefone: string, pin: string): Promise<LoginResult> {
-  console.log("[AUTH] login() chamado");
-  console.log("[AUTH] Telefone normalizado:", normalizePhone(telefone));
+function mapRole(role: string): string {
+  return role.toLowerCase();
+}
 
-  const res = await post<ApiLoginResponse>("/api/Auth/login", {
-    phoneNumber: normalizePhone(telefone),
-    password: pin,
-  });
-
-  console.log("[AUTH] Resposta login:", res);
-  console.log("[AUTH] Token recebido:", res.token ? `${res.token.slice(0, 20)}...` : "NULO");
-  console.log("[AUTH] User recebido:", res.user);
-
-  setToken(res.token);
+function mapAuthResponse(response: AuthApiResponse): LoginResult {
+  setToken(response.token);
 
   return {
-    userId: res.user.id,
-    nome: res.user.fullName,
-    role: res.user.role as UserRole,
-    token: res.token,
+    token: response.token,
+    userId: response.user.id,
+    nome: response.user.fullName,
+    role: mapRole(response.user.role),
   };
 }
 
-export async function register(nome: string, telefone: string, pin: string): Promise<LoginResult> {
-  console.log("[AUTH] register() chamado");
-  console.log("[AUTH] Nome:", nome, "| Telefone normalizado:", normalizePhone(telefone));
-
-  const res = await post<ApiLoginResponse>("/api/Auth/register", {
-    fullName: nome,
-    phoneNumber: normalizePhone(telefone),
-    password: pin,
+export async function login(phoneNumber: string, password: string): Promise<LoginResult> {
+  const response = await post<AuthApiResponse>("/api/Auth/login", {
+    phoneNumber: normalizeAngolaPhone(phoneNumber),
+    password,
   });
 
-  console.log("[AUTH] Resposta register:", res);
-  console.log("[AUTH] Token recebido:", res.token ? `${res.token.slice(0, 20)}...` : "NULO");
-  console.log("[AUTH] User recebido:", res.user);
+  return mapAuthResponse(response);
+}
 
-  setToken(res.token);
+export async function register(
+  fullName: string,
+  phoneNumber: string,
+  password: string,
+  biNumber: string,
+): Promise<LoginResult> {
+  const response = await post<AuthApiResponse>("/api/Auth/register", {
+    fullName: fullName.trim(),
+    phoneNumber: normalizeAngolaPhone(phoneNumber),
+    biNumber: biNumber.trim().toUpperCase(),
+    password,
+  });
 
-  return {
-    userId: res.user.id,
-    nome: res.user.fullName,
-    role: res.user.role as UserRole,
-    token: res.token,
-  };
+  return mapAuthResponse(response);
+}
+
+export async function getCurrentUser(): Promise<ApiUser> {
+  return get<ApiUser>("/api/Auth/me");
+}
+
+export function logout(): void {
+  clearToken();
 }

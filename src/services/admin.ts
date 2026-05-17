@@ -1,5 +1,6 @@
 import { get, post, put, del } from "./client";
-import type { PlatformStats, Membro } from "@/types";
+import { normalizeAngolaPhone } from "./helpers";
+import type { PlatformStats, Membro, PaginatedResponse, UserRole } from "@/types";
 import type { ApiUser } from "./users";
 
 interface ApiMetrics {
@@ -15,6 +16,30 @@ interface ApiMetrics {
   averageScore: number;
 }
 
+export type AdminUserRole = "admin" | "coordinator" | "agent" | "member";
+
+export interface CreateUserByAdminRequest {
+  fullName: string;
+  phoneNumber: string;
+  biNumber: string;
+  password: string;
+  role: AdminUserRole;
+}
+
+export interface UpdateUserByAdminRequest {
+  fullName: string;
+  phoneNumber: string;
+  biNumber: string;
+  role: UserRole | string;
+}
+
+const ROLE_TO_API: Record<UserRole, string> = {
+  member: "Member",
+  coordinator: "Coordinator",
+  admin: "Admin",
+  agent: "Agent",
+};
+
 function apiUserToMembro(u: ApiUser, idx: number): Membro {
   const iniciais = u.fullName
     .split(" ")
@@ -22,6 +47,7 @@ function apiUserToMembro(u: ApiUser, idx: number): Membro {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
   const cores = [
     "#FF5C1A",
     "#1D4ED8",
@@ -36,8 +62,9 @@ function apiUserToMembro(u: ApiUser, idx: number): Membro {
     "#6D28D9",
     "#0F766E",
   ];
+
   return {
-    id: idx + 1,
+    id: u.id,
     nome: u.fullName,
     tel: u.phoneNumber,
     posicao: (idx % 12) + 1,
@@ -54,28 +81,72 @@ function apiUserToMembro(u: ApiUser, idx: number): Membro {
 export async function getAllMembrosAdmin(
   page = 1,
   pageSize = 50,
+  role?: UserRole,
 ): Promise<{ membros: Membro[]; total: number }> {
-  const users = await get<ApiUser[]>("/api/admin/users");
+  const response = await get<PaginatedResponse<ApiUser> | ApiUser[]>("/api/admin/users", {
+    page,
+    pageSize,
+    role: role ? ROLE_TO_API[role] : undefined,
+  });
+
+  const users = Array.isArray(response) ? response : response.items;
+
   return {
     membros: users.map(apiUserToMembro),
-    total: users.length,
+    total: Array.isArray(response) ? users.length : response.totalItems,
   };
+}
+
+export async function getUsersByRole(
+  role: UserRole,
+  page = 1,
+  pageSize = 50,
+): Promise<{ membros: Membro[]; total: number }> {
+  return getAllMembrosAdmin(page, pageSize, role);
+}
+
+export async function createUserByAdmin(
+  body: CreateUserByAdminRequest,
+): Promise<ApiUser> {
+  return post<ApiUser>("/api/admin/users", {
+    ...body,
+    phoneNumber: normalizeAngolaPhone(body.phoneNumber),
+    biNumber: body.biNumber.trim().toUpperCase(),
+  });
 }
 
 export async function createUser(data: {
   fullName: string;
   phoneNumber: string;
   password: string;
-  role: string;
+  role: UserRole | string;
+  biNumber: string;
 }): Promise<ApiUser> {
-  return post<ApiUser>("/api/admin/users", data);
+  return createUserByAdmin({
+    fullName: data.fullName,
+    phoneNumber: data.phoneNumber,
+    password: data.password,
+    biNumber: data.biNumber,
+    role: data.role as AdminUserRole,
+  });
 }
 
 export async function updateAgenteStatus(
   agenteId: string | number,
-  role: string,
+  role: UserRole | string,
 ): Promise<unknown> {
   return put(`/api/admin/users/${agenteId}/role`, { role });
+}
+
+export async function updateUserByAdmin(
+  userId: string | number,
+  data: UpdateUserByAdminRequest,
+): Promise<ApiUser> {
+  return put<ApiUser>(`/api/admin/users/${userId}`, {
+    ...data,
+    phoneNumber: normalizeAngolaPhone(data.phoneNumber),
+    biNumber: data.biNumber.trim().toUpperCase(),
+  });
 }
 
 export async function removeMembroAdmin(membroId: string | number): Promise<void> {
@@ -84,6 +155,7 @@ export async function removeMembroAdmin(membroId: string | number): Promise<void
 
 export async function getPlatformMetrics(): Promise<PlatformStats> {
   const raw = await get<ApiMetrics>("/api/Metrics/platform");
+
   const stats: PlatformStats = {
     totalMembros: raw.totalMembers,
     totalGrupos: raw.activeGroups,
@@ -95,6 +167,7 @@ export async function getPlatformMetrics(): Promise<PlatformStats> {
     fundosCirculacao: raw.totalPendingAmount,
     crescimentoMensal: 0,
   };
+
   return stats;
 }
 

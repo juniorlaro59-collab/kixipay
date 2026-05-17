@@ -82,11 +82,17 @@ function MembrosView({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"todos" | "Pago" | "Pendente" | "Em atraso">("todos");
   const [membros, setMembros] = useState<Membro[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   useEffect(() => {
-    import("@/services").then(({ getAllMembrosAdmin }) =>
-      getAllMembrosAdmin(1, 50)
+    setLoading(true);
+    setError("");
+    import("@/services").then(({ getUsersByRole }) =>
+      getUsersByRole("member", 1, 50)
         .then((r) => setMembros(r.membros))
-        .catch(() => {}),
+        .catch(() => setError("Erro ao carregar membros"))
+        .finally(() => setLoading(false)),
     );
   }, []);
   const filtered = useMemo(
@@ -163,6 +169,15 @@ function MembrosView({
           ))}
         </div>
       </div>
+      {loading ? (
+        <div className="kx-card" style={{ padding: 20, color: "var(--ink-3)", fontSize: 13 }}>
+          A carregar membros...
+        </div>
+      ) : error ? (
+        <div className="kx-card" style={{ padding: 20, color: "var(--red)", fontSize: 13 }}>
+          {error}
+        </div>
+      ) : (
       <div className="kx-card" style={{ overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -244,6 +259,7 @@ function MembrosView({
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

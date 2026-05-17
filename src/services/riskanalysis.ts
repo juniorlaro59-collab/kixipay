@@ -1,14 +1,10 @@
 import { get } from "./client";
+import { normalizeAngolaPhone } from "./helpers";
 
 export interface RiskAnalysisResult {
-  userId: string;
-  fullName: string;
-  phoneNumber: string;
-  score: number;
   riskLevel: string;
-  factors: { factor: string; impact: string; weight: number }[];
   recommendation: string;
-  analysedAt: string;
+  reason: string;
 }
 
 export async function getMyRiskAnalysis(): Promise<RiskAnalysisResult> {
@@ -16,5 +12,7 @@ export async function getMyRiskAnalysis(): Promise<RiskAnalysisResult> {
 }
 
 export async function getRiskAnalysisByPhone(phoneNumber: string): Promise<RiskAnalysisResult> {
-  return get<RiskAnalysisResult>("/api/RiskAnalysis/by-phone", { phoneNumber });
+  return get<RiskAnalysisResult>("/api/RiskAnalysis/by-phone", {
+    phoneNumber: normalizeAngolaPhone(phoneNumber),
+  });
 }

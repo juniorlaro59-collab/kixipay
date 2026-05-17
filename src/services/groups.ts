@@ -1,103 +1,109 @@
 import { get, post, del } from "./client";
-import type { Grupo } from "@/types";
 
-export interface CurrentCycle {
+export interface GroupResponse {
+  id: string;
+  name: string;
+  contributionAmount: number;
+  frequency: string;
+  maxMembers: number;
+  currentMembers: number;
+  guaranteeFund: number;
+  status: string;
+}
+
+export interface GroupJoinRequest {
   id: string;
   groupId: string;
-  cycleNumber: number;
-  beneficiaryName: string;
-  deadlineDate: string;
-  status: string;
-  totalCollected: number;
-  totalContributions: number;
-  pendingContributions: number;
-}
-
-export interface CycleContribution {
-  id: string;
+  groupName: string;
+  userId: string;
   userName: string;
-  amount: number;
+  phoneNumber: string;
   status: string;
-  paidAt: string;
+  createdAt: string;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
 }
 
-export async function getGrupo(): Promise<Grupo> {
-  const grupos = await get<Grupo[]>("/api/Groups/my");
-  return grupos[0];
+export interface PaginatedApiResponse<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
-export async function getCurrentCycle(groupId: string): Promise<CurrentCycle> {
-  return get<CurrentCycle>(`/api/Cycles/group/${groupId}/current`);
+export interface CreateGroupRequest {
+  name: string;
+  contributionAmount: number;
+  frequency: string;
+  maxMembers: number;
+  guaranteeFundContribution: number;
 }
 
-export async function getContribuicoes(cycleId: string): Promise<CycleContribution[]> {
-  return get<CycleContribution[]>(`/api/Cycles/${cycleId}/contributions`);
+export interface JoinGroupRequest {
+  groupId: string;
+  vouchedByUserId?: string | null;
 }
 
-export async function contributeToCycle(
-  cycleId: string,
-  transactionReference?: string,
-): Promise<{ success: boolean; message: string }> {
-  return post("/api/Cycles/contribute", {
-    cycleId,
-    transactionReference: transactionReference || `MANUAL-${Date.now()}`,
+export interface RejectGroupJoinRequest {
+  reason: string;
+}
+
+export async function createGroup(body: CreateGroupRequest): Promise<GroupResponse> {
+  return post<GroupResponse>("/api/Groups", body);
+}
+
+export async function getGroups(
+  page = 1,
+  pageSize = 20,
+): Promise<PaginatedApiResponse<GroupResponse>> {
+  return get<PaginatedApiResponse<GroupResponse>>("/api/Groups", {
+    page,
+    pageSize,
   });
 }
 
-export type PaymentFrequency = "weekly" | "biweekly" | "monthly";
-
-export async function createGroup(data: {
-  name: string;
-  contributionAmount: number;
-  frequency: PaymentFrequency;
-  maxMembers: number;
-  guaranteeFundContribution: number;
-}): Promise<Grupo> {
-  return post<Grupo>("/api/Groups", data);
+export async function joinGroup(body: JoinGroupRequest): Promise<unknown> {
+  return post("/api/Groups/join", body);
 }
 
-export async function getGroupById(groupId: string): Promise<Grupo> {
-  return get<Grupo>(`/api/Groups/${groupId}`);
-}
-
-export async function leaveGroup(groupId: string): Promise<{ success: boolean; message: string }> {
-  return del(`/api/Groups/${groupId}/leave`);
-}
-
-export async function startCycle(groupId: string): Promise<{ success: boolean; message: string }> {
-  return post(`/api/Cycles/group/${groupId}/start`, {});
-}
-
-export async function getAllGroups(): Promise<Grupo[]> {
-  return get<Grupo[]>("/api/Groups");
-}
-
-export async function getGroupJoinRequests(
+export async function getPendingJoinRequests(
   groupId: string,
-): Promise<
-  {
-    id: string;
-    userId: string;
-    fullName: string;
-    phoneNumber: string;
-    status: string;
-    createdAt: string;
-  }[]
-> {
-  return get(`/api/Groups/${groupId}/join-requests`);
+  page = 1,
+  pageSize = 10,
+): Promise<PaginatedApiResponse<GroupJoinRequest>> {
+  return get<PaginatedApiResponse<GroupJoinRequest>>(
+    `/api/Groups/${groupId}/join-requests`,
+    {
+      page,
+      pageSize,
+    },
+  );
 }
 
-export async function approveJoinRequest(
-  requestId: string,
-): Promise<{ success: boolean; message: string }> {
+export async function approveJoinRequest(requestId: string): Promise<unknown> {
   return post(`/api/Groups/join-requests/${requestId}/approve`, {});
 }
 
-export async function rejectJoinRequest(
-  requestId: string,
-  reason?: string,
-): Promise<{ success: boolean; message: string }> {
+export async function rejectJoinRequest(requestId: string, reason: string): Promise<unknown> {
   return post(`/api/Groups/join-requests/${requestId}/reject`, {
-    reason: reason || "Pedido rejeitado",
-  });
+    reason,
+  } satisfies RejectGroupJoinRequest);
+}
+
+export async function getGroupById(groupId: string): Promise<GroupResponse> {
+  return get<GroupResponse>(`/api/Groups/${groupId}`);
+}
+
+export async function getMyGroup(): Promise<GroupResponse> {
+  return get<GroupResponse>("/api/Groups/my");
+}
+
+// Alias para compatibilidade com código antigo
+export async function getGrupo(): Promise<GroupResponse> {
+  return getMyGroup();
+}
+
+export async function leaveGroup(groupId: string): Promise<void> {
+  await del<void>(`/api/Groups/${groupId}/leave`);
 }

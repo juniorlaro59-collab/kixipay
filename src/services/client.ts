@@ -19,7 +19,7 @@ type RequestOptions = {
   method?: Method;
   data?: unknown;
   headers?: Record<string, string>;
-  params?: Record<string, string>;
+  params?: Record<string, string | number | boolean | undefined>;
 };
 
 function getToken(): string | null {
@@ -55,12 +55,46 @@ export class ApiClientError extends Error {
   }
 }
 
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiClientError) {
+    if (error.status >= 500) return fallback;
+    return error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+
+  return fallback;
+}
+
 function getDebugUrl(endpoint: string): string {
   return `${API_BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
 }
 
+function isApiResponse<T>(value: unknown): value is ApiResponse<T> {
+  return typeof value === "object" && value !== null && "success" in value;
+}
+
+function getMessageFromBody(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+
+  const value = body as {
+    message?: string;
+    error?: ApiError;
+  };
+
+  return value.error?.message ?? value.message ?? fallback;
+}
+
+function isAuthEndpoint(endpoint: string): boolean {
+  const value = endpoint.toLowerCase();
+  return value.includes("/api/auth/login") || value.includes("/api/auth/register");
+}
+
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const token = getToken();
+
   const headers: Record<string, string> = {
     ...options.headers,
     "ngrok-skip-browser-warning": "true",
@@ -79,6 +113,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   let res;
+
   try {
     res = await http.request<ApiResponse<T> | { error?: ApiError; message?: string } | T>({
       url: endpoint,
@@ -90,12 +125,14 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error(`[API] NETWORK_ERROR ${debugUrl}:`, error.message);
+
       throw new ApiClientError(
         error.response?.status ?? 0,
         "NETWORK_ERROR",
-        "Nao foi possivel contactar o servidor. Verifique a ligacao e tente novamente.",
+        "Não foi possível contactar o servidor. Verifique a ligação e tente novamente.",
       );
     }
+
     throw error;
   }
 
@@ -104,37 +141,65 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     console.log("[API] Response body:", res.data);
   }
 
-  if (res.status === 401) {
-    console.warn("[API] 401 - sessao expirada, token limpo");
-    clearToken();
-    dispatchUnauthorized();
-    throw new ApiClientError(401, "UNAUTHORIZED", "Sessao expirada. Faca login novamente.");
-  }
+  const json = res.data;
 
   if (res.status < 200 || res.status >= 300) {
-    const body = (res.data ?? {}) as { error?: ApiError; message?: string };
-    const msg = body.error?.message ?? body.message ?? `Erro ${res.status}`;
-    console.error(`[API] ${res.status} ${debugUrl}:`, msg, body);
-    throw new ApiClientError(res.status, body.error?.code ?? "REQ_ERROR", msg, body.error?.details);
+    const msg = getMessageFromBody(json, `Erro ${res.status}`);
+
+    if (res.status === 401) {
+      const body = (res.data ?? {}) as {
+        error?: ApiError;
+        message?: string;
+      };
+
+      const msg = body.error?.message ?? body.message ?? "Sessão expirada. Faça login novamente.";
+
+      console.warn("[API] 401:", msg);
+
+      clearToken();
+
+      if (!isAuthEndpoint(endpoint)) {
+        dispatchUnauthorized();
+      }
+
+      throw new ApiClientError(401, "UNAUTHORIZED", msg, body.error?.details);
+    }
+
+    const body = (json ?? {}) as {
+      error?: ApiError;
+      message?: string;
+    };
+
+    throw new ApiClientError(
+      res.status,
+      body.error?.code ?? "REQ_ERROR",
+      msg,
+      body.error?.details,
+    );
   }
 
-  const json = res.data as ApiResponse<T> | undefined;
+  if (isApiResponse<T>(json)) {
+    if (json.success === false) {
+      throw new ApiClientError(res.status, "API_ERROR", json.message || "Erro da API");
+    }
 
-  if (json && typeof json === "object" && "success" in json && json.success === false) {
-    console.error("[API] success=false:", json);
-    throw new ApiClientError(res.status, "API_ERROR", json.message ?? "Erro da API");
-  }
+    if (json.data !== undefined && json.data !== null) {
+      if (IS_DEV) console.log("[API] data extraído do wrapper:", json.data);
+      return json.data;
+    }
 
-  if (json && typeof json === "object" && "data" in json && json.data !== undefined) {
-    if (IS_DEV) console.log("[API] data extraido do wrapper:", json.data);
-    return json.data;
+    return json.data as T;
   }
 
   if (IS_DEV) console.log("[API] raw response devolvida:", res.data);
+
   return res.data as T;
 }
 
-export async function get<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
+export async function get<T>(
+  endpoint: string,
+  params?: Record<string, string | number | boolean | undefined>,
+): Promise<T> {
   return request<T>(endpoint, { params });
 }
 

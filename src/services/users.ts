@@ -4,9 +4,10 @@ export interface ApiUser {
   id: string;
   fullName: string;
   phoneNumber: string;
+  biNumber?: string;
   score: number;
-  level: string;
-  role: string;
+  level: string | number;
+  role: string | number;
   pendingDebt: number;
 }
 

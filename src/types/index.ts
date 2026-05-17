@@ -8,7 +8,7 @@ export type TxStatus = "Pago" | "Pendente" | "Em atraso" | "Recebido" | "Enviado
 export type TxTipo = "Contribuição" | "Recebimento" | "Lembrete SMS";
 
 export interface Membro {
-  id: number;
+  id: string | number;
   nome: string;
   tel: string;
   posicao: number;
@@ -67,6 +67,14 @@ export interface ApiResponse<T> {
   success: boolean;
   message?: string;
   timestamp?: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface ApiError {
@@ -231,6 +239,7 @@ export interface ActividadeAgente {
 export interface CadastroPayload {
   nome: string;
   telefone: string;
+  biNumber: string;
   regiao: string;
   grupoCodigo?: string;
   coordenadorNome?: string;

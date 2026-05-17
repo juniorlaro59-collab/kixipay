@@ -1,18 +1,67 @@
-import { useEffect, useState } from "react";
-import { Plus, Download, Send, Wallet, Users, Clock, Star, Check } from "lucide-react";
-import { Avatar } from "@/components/kixipay/shared";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Plus,
+  Download,
+  Send,
+  Wallet,
+  Users,
+  Clock,
+  Star,
+  Check,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  UserPlus,
+  ListChecks,
+  PlayCircle,
+  Activity,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+import { Avatar, EmptyState, ErrorState, Skeleton, StatusBadge } from "@/components/kixipay/shared";
 import { fmtKz } from "@/components/kixipay/data";
 import { ROTACAO_MESES } from "@/lib/constants";
+
 import type { Membro } from "@/components/kixipay/data";
 import type { ToastFn } from "@/components/shared/AppLayout";
-import { getGrupo, getCurrentCycle } from "@/services";
-import type { CurrentCycle } from "@/services";
-import type { Grupo } from "@/types";
+
+import {
+  approveJoinRequest,
+  rejectJoinRequest,
+  getCurrentCycle
+} from "@/services";
+
+
+import { getApiErrorMessage } from "@/services/client";
+import { GroupJoinRequest, GroupResponse, getMyGroup, getPendingJoinRequests } from "@/services/groups";
+import { CycleContribution, CycleResponse, getCycleContributions, startNextCycle } from "@/services/cycles";
 
 type ModalOpener = (
   m: "contribuicao" | "addMembro" | "confirmarPagamento" | "recomendacao",
   data?: Membro,
 ) => void;
+
+function getInitials(name: string): string {
+  return name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((x: string) => x[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function normalizeContributionStatus(status: string): "Pago" | "Pendente" | "Em atraso" {
+  const value = status.toLowerCase();
+
+  if (value.includes("paid") || value.includes("pago")) return "Pago";
+  if (value.includes("late") || value.includes("default") || value.includes("atras")) {
+    return "Em atraso";
+  }
+
+  return "Pendente";
+}
 
 export function CoordinatorDashboard({
   user,
@@ -23,51 +72,244 @@ export function CoordinatorDashboard({
   openModal: ModalOpener;
   toast: ToastFn;
 }) {
-  const [grupo, setGrupo] = useState<Grupo | null>(null);
-  const [cycle, setCycle] = useState<CurrentCycle | null>(null);
+  const [grupo, setGrupo] = useState<GroupResponse | null>(null);
+  const [cycle, setCycle] = useState<CycleResponse | null>(null);
+  const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
+  const [contributions, setContributions] = useState<CycleContribution[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [loadingCycle, setLoadingCycle] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
+  const [startingCycle, setStartingCycle] = useState(false);
+
+  const alreadyLoadedRef = useRef(false);
+  const loadingRef = useRef(false);
+
+  const loadDashboard = useCallback(
+    async (force = false) => {
+      if (!force && alreadyLoadedRef.current) return;
+      if (loadingRef.current) return;
+
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const group = await getMyGroup();
+
+        setGrupo(group);
+
+        if (group?.id) {
+          setLoadingCycle(true);
+
+          const [currentCycle, pendingRequests] = await Promise.all([
+            getCurrentCycle(group.id),
+            getPendingJoinRequests(group.id, 1, 10),
+          ]);
+
+          setCycle(currentCycle);
+          setJoinRequests(pendingRequests.items ?? []);
+
+          if (currentCycle?.id) {
+            const cycleContributions = await getCycleContributions(currentCycle.id, 1, 20);
+            setContributions(cycleContributions.items ?? []);
+          } else {
+            setContributions([]);
+          }
+        } else {
+          setCycle(null);
+          setJoinRequests([]);
+          setContributions([]);
+        }
+
+        alreadyLoadedRef.current = true;
+      } catch (error) {
+        setError(getApiErrorMessage(error, "Erro ao carregar painel do coordenador"));
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+        setLoadingCycle(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    getGrupo()
-      .then(setGrupo)
-      .catch(() => {});
-  }, []);
+    loadDashboard();
+  }, [loadDashboard]);
 
-  useEffect(() => {
-    if (grupo?.id) {
-      getCurrentCycle(grupo.id)
-        .then(setCycle)
-        .catch(() => {});
+  const refresh = () => {
+    alreadyLoadedRef.current = false;
+    loadDashboard(true);
+  };
+
+  const handleApproveJoinRequest = async (requestId: string) => {
+    if (reviewingRequestId) return;
+
+    setReviewingRequestId(requestId);
+
+    try {
+      await approveJoinRequest(requestId);
+
+      setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      toast("sucesso", "Pedido aprovado com sucesso");
+
+      refresh();
+    } catch (error) {
+      toast("erro", getApiErrorMessage(error, "Erro ao aprovar pedido"));
+    } finally {
+      setReviewingRequestId(null);
     }
-  }, [grupo?.id]);
+  };
 
-  const grupoNome = grupo?.nome || "Kixikila Rangel";
-  const totalMembros = grupo?.membros?.length || 12;
+  const handleRejectJoinRequest = async (requestId: string) => {
+    if (reviewingRequestId) return;
+
+    const reason = window.prompt("Motivo da rejeição:");
+
+    if (!reason?.trim()) {
+      toast("aviso", "Informe o motivo da rejeição");
+      return;
+    }
+
+    setReviewingRequestId(requestId);
+
+    try {
+      await rejectJoinRequest(requestId, reason.trim());
+
+      setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      toast("sucesso", "Pedido rejeitado com sucesso");
+
+      refresh();
+    } catch (error) {
+      toast("erro", getApiErrorMessage(error, "Erro ao rejeitar pedido"));
+    } finally {
+      setReviewingRequestId(null);
+    }
+  };
+
+  const handleStartNextCycle = async () => {
+    if (!grupo?.id || startingCycle) return;
+
+    setStartingCycle(true);
+
+    try {
+      const nextCycle = await startNextCycle(grupo.id);
+
+      setCycle(nextCycle);
+      toast("sucesso", "Próximo ciclo iniciado com sucesso");
+
+      refresh();
+    } catch (error) {
+      toast("erro", getApiErrorMessage(error, "Erro ao iniciar próximo ciclo"));
+    } finally {
+      setStartingCycle(false);
+    }
+  };
+
+  const grupoNome = grupo?.name || "Grupo não carregado";
+  const totalMembros = grupo?.currentMembers ?? 0;
+  const maxMembros = grupo?.maxMembers ?? totalMembros;
+
   const contribRecebidas = cycle?.totalContributions ?? 0;
   const contribPendentes = cycle?.pendingContributions ?? 0;
   const totalPrevisto = contribRecebidas + contribPendentes;
   const progresso = totalPrevisto > 0 ? Math.round((contribRecebidas / totalPrevisto) * 100) : 0;
-  const saldoTotal = cycle?.totalCollected ?? 0;
-  const beneficiario = cycle?.beneficiaryName || "Manuel Jacinto";
-  const membros = grupo?.membros ?? [];
-  const scoreMedio =
-    membros.length > 0 ? Math.round(membros.reduce((s, m) => s + m.score, 0) / membros.length) : 0;
+
+  const saldoTotal = cycle?.totalCollected ?? grupo?.guaranteeFund ?? 0;
+  const beneficiario = cycle?.beneficiaryName || "Sem beneficiário definido";
+
+  const scoreMedio = "—";
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <Skeleton width={320} height={36} />
+
+        <div
+          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}
+          className="kx-kpi-grid"
+        >
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="kx-card" style={{ padding: 20, height: 120 }}>
+              <Skeleton width="80%" height={16} />
+              <div style={{ marginTop: 8 }}>
+                <Skeleton width="60%" height={32} />
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <Skeleton width="40%" height={12} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Skeleton height={260} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={refresh} />;
+  }
+
+  if (!grupo) {
+    return <ErrorState message="Nenhum grupo encontrado para este coordenador" onRetry={refresh} />;
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <h1 className="kx-display" style={{ fontSize: 28 }}>
-          Olá, {user.nome.split(" ")[0]} 👋
-        </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
-          <span style={{ color: "var(--ink-3)", fontSize: 14 }}>15 de Maio de 2026</span>
-          <span
-            className="kx-pill"
-            style={{ background: "var(--brand-light)", color: "var(--brand)" }}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1 className="kx-display" style={{ fontSize: 28 }}>
+            Olá, {user.nome.split(" ")[0]} 👋
+          </h1>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+            <span style={{ color: "var(--ink-3)", fontSize: 14 }}>Painel do Coordenador</span>
+
+            <span
+              className="kx-pill"
+              style={{ background: "var(--brand-light)", color: "var(--brand)" }}
+            >
+              {grupoNome}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={handleStartNextCycle}
+            disabled={startingCycle || loadingCycle}
+            className="kx-btn kx-btn-primary"
+            style={{ opacity: startingCycle ? 0.7 : 1 }}
           >
-            Coordenadora · {grupoNome}
-          </span>
+            {startingCycle ? (
+              <>
+                <RefreshCw size={14} /> A iniciar...
+              </>
+            ) : (
+              <>
+                <PlayCircle size={14} /> Iniciar ciclo
+              </>
+            )}
+          </button>
+
+          <button onClick={refresh} className="kx-btn kx-btn-outline">
+            <RefreshCw size={14} /> Actualizar
+          </button>
         </div>
       </div>
+
       <div
         style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}
         className="kx-kpi-grid"
@@ -78,18 +320,20 @@ export function CoordinatorDashboard({
           Icon={Wallet}
           label="Saldo Total"
           valor={fmtKz(saldoTotal)}
-          sub={`↑ +${fmtKz(5000)} este mês`}
+          sub="Total arrecadado no ciclo"
           subCor="var(--green)"
         />
+
         <KpiCard
           cor="var(--green)"
           bg="var(--green-light)"
           Icon={Users}
           label="Membros Activos"
-          valor={`${totalMembros} / ${totalMembros}`}
-          sub="100% presentes"
+          valor={`${totalMembros} / ${maxMembros}`}
+          sub={`${maxMembros > 0 ? Math.round((totalMembros / maxMembros) * 100) : 0}% da capacidade`}
           subCor="var(--green)"
         />
+
         <KpiCard
           cor="var(--orange-mid)"
           bg="var(--gold-light)"
@@ -99,15 +343,17 @@ export function CoordinatorDashboard({
           sub={`${progresso}% recebidas · ${contribPendentes} pendentes`}
           progress={progresso}
         />
+
         <KpiCard
           cor="var(--gold)"
           bg="var(--gold-light)"
           Icon={Star}
           label="KixiScore Médio"
           valor={`${scoreMedio} ★`}
-          sub="Grupo excelente"
+          sub="Não disponível na resposta do grupo"
         />
       </div>
+
       <div
         style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 20 }}
         className="kx-dash-grid"
@@ -122,14 +368,26 @@ export function CoordinatorDashboard({
             progresso={progresso}
             valorPago={saldoTotal}
           />
-          <RotacaoCompleta />
+
+          <PedidosEntrada
+            requests={joinRequests}
+            reviewingRequestId={reviewingRequestId}
+            onApprove={handleApproveJoinRequest}
+            onReject={handleRejectJoinRequest}
+          />
+
+          <RotacaoCompleta currentPosition={cycle?.cycleNumber ?? 1} />
         </div>
+
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <ContribuicoesChart />
-          <ActividadeRecente />
-          <AccoesRapidas openModal={openModal} toast={toast} />
+          <ContribuicoesResumo contributions={contributions} />
+
+          <ActividadeRecente contributions={contributions} joinRequests={joinRequests} />
+
+          <AccoesRapidas openModal={openModal} toast={toast} onRefresh={refresh} />
         </div>
       </div>
+
       <style>{`
         @media (max-width: 1100px) { .kx-kpi-grid { grid-template-columns: 1fr 1fr !important; } }
         @media (max-width: 600px) { .kx-kpi-grid { grid-template-columns: 1fr !important; } }
@@ -149,7 +407,7 @@ function KpiCard({
   bg,
   progress,
 }: {
-  Icon: typeof Wallet;
+  Icon: LucideIcon;
   label: string;
   valor: string;
   sub: string;
@@ -175,6 +433,7 @@ function KpiCard({
         >
           {label}
         </div>
+
         <div
           style={{
             width: 36,
@@ -189,10 +448,13 @@ function KpiCard({
           <Icon size={18} color={cor} />
         </div>
       </div>
+
       <div className="kx-num" style={{ fontSize: 28, color: "var(--ink)", marginTop: 8 }}>
         {valor}
       </div>
+
       <div style={{ fontSize: 12, color: subCor || "var(--ink-3)", marginTop: 4 }}>{sub}</div>
+
       {progress !== undefined && (
         <div
           style={{
@@ -203,7 +465,7 @@ function KpiCard({
             overflow: "hidden",
           }}
         >
-          <div style={{ width: `${progress}%`, height: "100%", background: cor }} />
+          <div style={{ width: `${Math.min(100, progress)}%`, height: "100%", background: cor }} />
         </div>
       )}
     </div>
@@ -227,6 +489,8 @@ function ProximoRecebimento({
   progresso: number;
   valorPago: number;
 }) {
+  const initials = getInitials(beneficiario);
+
   return (
     <div className="kx-card" style={{ padding: 24 }}>
       <div
@@ -240,18 +504,23 @@ function ProximoRecebimento({
       >
         Quem recebe este mês
       </div>
+
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-        <Avatar iniciais="MJ" cor="#1D4ED8" size={60} />
+        <Avatar iniciais={initials || "??"} cor="#1D4ED8" size={60} />
+
         <div style={{ flex: 1 }}>
           <div className="kx-display" style={{ fontSize: 22, fontWeight: 700 }}>
             {beneficiario}
           </div>
+
           <div style={{ fontSize: 13, color: "var(--ink-3)" }}>Próximo recebimento</div>
         </div>
+
         <div className="kx-num" style={{ fontSize: 26, color: "var(--green)" }}>
           {fmtKz(valorPago)}
         </div>
       </div>
+
       <div style={{ marginBottom: 16 }}>
         <div
           style={{
@@ -267,6 +536,7 @@ function ProximoRecebimento({
           </span>
           <span>{progresso}%</span>
         </div>
+
         <div
           style={{
             height: 6,
@@ -278,14 +548,16 @@ function ProximoRecebimento({
           <div style={{ width: `${progresso}%`, height: "100%", background: "var(--brand)" }} />
         </div>
       </div>
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button
           onClick={() => openModal("confirmarPagamento")}
           className="kx-btn kx-btn-primary"
           style={{ flex: 1, minWidth: 200 }}
         >
-          ✓ Confirmar pagamento ao {beneficiario.split(" ")[0]}
+          ✓ Confirmar pagamento
         </button>
+
         <button
           onClick={() => toast("info", "SMS de aviso enviado")}
           className="kx-btn kx-btn-outline"
@@ -297,90 +569,90 @@ function ProximoRecebimento({
   );
 }
 
-function RotacaoCompleta() {
-  const [membrosLista, setMembrosLista] = useState<Membro[]>([]);
-  useEffect(() => {
-    import("@/services").then(({ getGrupo }) =>
-      getGrupo()
-        .then((g) => setMembrosLista(g?.membros ?? []))
-        .catch(() => {}),
-    );
-  }, []);
+function PedidosEntrada({
+  requests,
+  reviewingRequestId,
+  onApprove,
+  onReject,
+}: {
+  requests: GroupJoinRequest[];
+  reviewingRequestId: string | null;
+  onApprove: (requestId: string) => void;
+  onReject: (requestId: string) => void;
+}) {
   return (
     <div className="kx-card" style={{ padding: 24 }}>
-      <div
-        style={{
-          fontSize: 12,
-          color: "var(--ink-3)",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          marginBottom: 14,
-        }}
-      >
-        Rotação completa do grupo
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <UserPlus size={16} color="var(--brand)" />
+
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--ink-3)",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          Pedidos de entrada no grupo
+        </span>
       </div>
-      <div
-        className="kx-scroll"
-        style={{
-          maxHeight: 320,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-        }}
-      >
-        {membrosLista.length === 0 ? (
-          <div style={{ padding: 20, textAlign: "center", color: "var(--ink-3)", fontSize: 13 }}>
-            Nenhum membro disponível
-          </div>
-        ) : (
-          [...membrosLista]
-            .sort((a, b) => a.posicao - b.posicao)
-            .map((m) => {
-              const isCurrent = m.posicao === 7;
-              const isPast = m.posicao < 7;
-              return (
-                <div
-                  key={m.id}
+
+      {requests.length === 0 ? (
+        <EmptyState message="Nenhum pedido pendente" icon={UserPlus} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {requests.map((r) => (
+            <div
+              key={r.id}
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-soft)",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <Avatar iniciais={getInitials(r.userName)} cor="#FF5C1A" size={36} />
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{r.userName}</div>
+                <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{r.phoneNumber}</div>
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => onApprove(r.id)}
+                  disabled={reviewingRequestId === r.id}
+                  className="kx-btn kx-btn-sm kx-btn-primary"
+                  style={{ opacity: reviewingRequestId === r.id ? 0.7 : 1 }}
+                >
+                  <CheckCircle size={14} /> Aprovar
+                </button>
+
+                <button
+                  onClick={() => onReject(r.id)}
+                  disabled={reviewingRequestId === r.id}
+                  className="kx-btn kx-btn-sm"
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    background: isCurrent ? "var(--brand-light)" : "transparent",
-                    color: isCurrent ? "var(--brand)" : "var(--ink)",
-                    fontWeight: isCurrent ? 600 : 400,
+                    background: "var(--red)",
+                    color: "#fff",
+                    opacity: reviewingRequestId === r.id ? 0.7 : 1,
                   }}
                 >
-                  <span
-                    className="kx-num"
-                    style={{
-                      width: 24,
-                      fontSize: 13,
-                      color: isCurrent ? "var(--brand)" : "var(--ink-3)",
-                    }}
-                  >
-                    {m.posicao}
-                  </span>
-                  <Avatar iniciais={m.iniciais} cor={m.cor} size={28} />
-                  <span style={{ flex: 1, fontSize: 13 }}>{m.nome}</span>
-                  <span
-                    style={{ fontSize: 12, color: isCurrent ? "var(--brand)" : "var(--ink-3)" }}
-                  >
-                    {ROTACAO_MESES[m.posicao - 1]}
-                  </span>
-                  {isPast && <Check size={14} color="var(--green)" />}
-                </div>
-              );
-            })
-        )}
-      </div>
+                  <XCircle size={14} /> Rejeitar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ContribuicoesChart() {
+function RotacaoCompleta({ currentPosition }: { currentPosition: number }) {
   return (
     <div className="kx-card" style={{ padding: 24 }}>
       <div
@@ -392,118 +664,224 @@ function ContribuicoesChart() {
           marginBottom: 14,
         }}
       >
-        Contribuições — Últimos 6 meses
+        Rotação do grupo
       </div>
+
       <div
         style={{
-          height: 220,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          padding: 20,
+          borderRadius: 14,
+          background: "var(--surface-2)",
+          border: "1px solid var(--border-soft)",
           color: "var(--ink-3)",
           fontSize: 13,
         }}
       >
-        Dados históricos indisponíveis
+        Ciclo actual:{" "}
+        <strong style={{ color: "var(--ink)" }}>
+          {currentPosition}
+        </strong>
+        . A lista completa da rotação depende de uma rota que devolva os membros do grupo.
       </div>
-    </div>
-  );
-}
 
-function ActividadeRecente() {
-  const [entries, setEntries] = useState<any[]>([]);
-  useEffect(() => {
-    Promise.resolve().then(() => setEntries([]));
-  }, []);
-  return (
-    <div className="kx-card" style={{ padding: 24 }}>
-      <div
-        style={{
-          fontSize: 12,
-          color: "var(--ink-3)",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          marginBottom: 14,
-        }}
-      >
-        Actividade recente
-      </div>
       <div
         className="kx-scroll"
         style={{
-          maxHeight: 280,
+          maxHeight: 220,
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: 8,
+          gap: 6,
+          marginTop: 12,
         }}
       >
-        {entries.length === 0 ? (
-          <div style={{ padding: 20, textAlign: "center", color: "var(--ink-3)", fontSize: 13 }}>
-            Nenhuma actividade recente
-          </div>
-        ) : (
-          entries.map((t: any) => (
+        {ROTACAO_MESES.map((mes, index) => {
+          const posicao = index + 1;
+          const isCurrent = posicao === currentPosition;
+          const isPast = posicao < currentPosition;
+
+          return (
             <div
-              key={t.id}
+              key={mes}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                padding: "8px 0",
-                borderBottom: "1px solid var(--border-soft)",
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: isCurrent ? "var(--brand-light)" : "transparent",
+                color: isCurrent ? "var(--brand)" : "var(--ink)",
+                fontWeight: isCurrent ? 600 : 400,
               }}
             >
-              <div
+              <span
+                className="kx-num"
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: "var(--surface-2)",
+                  width: 24,
+                  fontSize: 13,
+                  color: isCurrent ? "var(--brand)" : "var(--ink-3)",
                 }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {t.membro}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
-                  {t.tipo} · {t.data}
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                {t.valor > 0 && (
-                  <div className="kx-num" style={{ fontSize: 14 }}>
-                    {fmtKz(t.valor)}
-                  </div>
-                )}
-                <span
-                  className="kx-pill"
-                  style={{
-                    background: "var(--ink-4)",
-                    color: "var(--ink-2)",
-                    fontSize: 11,
-                  }}
-                >
-                  {t.status}
-                </span>
-              </div>
+              >
+                {posicao}
+              </span>
+
+              <span style={{ flex: 1, fontSize: 13 }}>{mes}</span>
+
+              {isCurrent && <span className="kx-pill">Actual</span>}
+              {isPast && <Check size={14} color="var(--green)" />}
             </div>
-          ))
-        )}
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function AccoesRapidas({ openModal, toast }: { openModal: ModalOpener; toast: ToastFn }) {
+function ContribuicoesResumo({ contributions }: { contributions: CycleContribution[] }) {
+  return (
+    <div className="kx-card" style={{ padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <ListChecks size={16} color="var(--blue)" />
+
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--ink-3)",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          Contribuições do ciclo
+        </span>
+      </div>
+
+      {contributions.length === 0 ? (
+        <EmptyState message="Nenhuma contribuição registada" icon={ListChecks} />
+      ) : (
+        <div
+          className="kx-scroll"
+          style={{
+            maxHeight: 320,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          {contributions.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                padding: 12,
+                borderRadius: 12,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-soft)",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <Avatar iniciais={getInitials(c.userName)} cor="#1D4ED8" size={34} />
+
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{c.userName}</div>
+                <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                  {c.paidAt ? new Date(c.paidAt).toLocaleDateString("pt-PT") : "Sem data"}
+                </div>
+              </div>
+
+              <div style={{ textAlign: "right" }}>
+                <div className="kx-num" style={{ fontSize: 14 }}>
+                  {fmtKz(c.amount)}
+                </div>
+
+                <StatusBadge status={normalizeContributionStatus(c.status)} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActividadeRecente({
+  contributions,
+  joinRequests,
+}: {
+  contributions: CycleContribution[];
+  joinRequests: GroupJoinRequest[];
+}) {
+  const entries = useMemo(() => {
+    const contribEntries = contributions.slice(0, 4).map((c) => ({
+      id: `c-${c.id}`,
+      label: c.userName,
+      desc: `Contribuição · ${fmtKz(c.amount)}`,
+      status: c.status,
+    }));
+
+    const requestEntries = joinRequests.slice(0, 4).map((r) => ({
+      id: `r-${r.id}`,
+      label: r.userName,
+      desc: "Pedido de entrada pendente",
+      status: r.status,
+    }));
+
+    return [...contribEntries, ...requestEntries].slice(0, 6);
+  }, [contributions, joinRequests]);
+
+  return (
+    <div className="kx-card" style={{ padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <Activity size={16} color="var(--blue)" />
+
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--ink-3)",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          Actividade recente
+        </span>
+      </div>
+
+      {entries.length === 0 ? (
+        <div style={{ padding: 20, textAlign: "center", color: "var(--ink-3)", fontSize: 13 }}>
+          Nenhuma actividade recente
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {entries.map((e) => (
+            <div
+              key={e.id}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 12,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-soft)",
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{e.label}</div>
+              <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>{e.desc}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccoesRapidas({
+  openModal,
+  toast,
+  onRefresh,
+}: {
+  openModal: ModalOpener;
+  toast: ToastFn;
+  onRefresh: () => void;
+}) {
   return (
     <div className="kx-card" style={{ padding: 24 }}>
       <div
@@ -517,24 +895,36 @@ function AccoesRapidas({ openModal, toast }: { openModal: ModalOpener; toast: To
       >
         Acções rápidas
       </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <button onClick={() => openModal("contribuicao")} className="kx-btn kx-btn-primary">
           <Plus size={14} /> Contribuição
         </button>
+
         <button onClick={() => openModal("addMembro")} className="kx-btn kx-btn-outline">
           <Plus size={14} /> Membro
         </button>
+
         <button
           onClick={() => toast("info", "Relatório PDF gerado · A descarregar...")}
           className="kx-btn kx-btn-outline"
         >
           <Download size={14} /> Exportar
         </button>
+
         <button
-          onClick={() => toast("info", "SMS enviado para 4 membros pendentes")}
+          onClick={() => toast("info", "SMS enviado para membros pendentes")}
           className="kx-btn kx-btn-outline"
         >
           <Send size={14} /> Lembrar
+        </button>
+
+        <button
+          onClick={onRefresh}
+          className="kx-btn kx-btn-outline"
+          style={{ gridColumn: "1 / -1" }}
+        >
+          <RefreshCw size={14} /> Actualizar dados
         </button>
       </div>
     </div>

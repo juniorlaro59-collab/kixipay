@@ -19,6 +19,7 @@ import { setAuthUser, persistAuth, restoreAuth, logout as authLogout } from "@/l
 import type { LoginResult } from "@/services";
 import { getCurrentUser } from "@/services";
 import type { ApiUser } from "@/services";
+import { UserRole } from "@/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,7 +50,11 @@ type ModalKind =
   | "recomendacao"
   | null;
 
-type AppUser = { userId: string; nome: string; role: string } | null;
+type AppUser = {
+  userId: string;
+  nome: string;
+  role: UserRole;
+} | null;
 
 function KixiPayApp() {
   const [user, setUser] = useState<AppUser>(null);
@@ -98,11 +103,19 @@ function KixiPayApp() {
     else setModalMem(null);
     setModal(m);
   }, []);
+function normalizeRole(role: string): UserRole {
+  const value = role.toLowerCase();
 
+  if (value === "admin") return "admin";
+  if (value === "agent") return "agent";
+  if (value === "coordinator") return "coordinator";
+
+  return "member";
+}
   const handleLogin = (result: LoginResult) => {
     const { userId, nome, role } = result;
-    setUser({ userId, nome, role });
-    setAuthUser({ userId, nome, role, token: result.token });
+    setUser({ userId, nome, role: normalizeRole(role) });
+    setAuthUser({ userId, nome, role: normalizeRole(role), token: result.token });
     persistAuth();
     setModal(null);
     getCurrentUser()
