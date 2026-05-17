@@ -8,7 +8,7 @@ export type TxStatus = "Pago" | "Pendente" | "Em atraso" | "Recebido" | "Enviado
 export type TxTipo = "Contribuição" | "Recebimento" | "Lembrete SMS";
 
 export interface Membro {
-  id: string | number;
+  id: string;
   nome: string;
   tel: string;
   posicao: number;

@@ -24,8 +24,9 @@ import { CoordinatorDashboard, CoordinatorScoreView } from "@/components/coordin
 import { HistoricoView } from "@/components/shared/HistoricoView";
 import { ConfigView } from "@/components/shared/ConfigView";
 
-import { getUsersByRole } from "@/services";
+import { getUsersByRole, GroupResponse } from "@/services";
 import { getApiErrorMessage } from "@/services/client";
+import { getCoordinatorGroups, getGroupMembers } from "@/services/groups";
 
 type ViewName = "dashboard" | "membros" | "score" | "ussd" | "historico" | "config";
 
@@ -71,9 +72,14 @@ export function CoordinatorShell({
         <CoordinatorDashboard user={user} openModal={openModal} toast={toast} />
       )}
 
-      {view === "membros" && (
-        <MembrosView openDrawer={openDrawer} openModal={openModal} toast={toast} />
-      )}
+     {view === "membros" && (
+  <MembrosView
+    user={user}
+    openDrawer={openDrawer}
+    openModal={openModal}
+    toast={toast}
+  />
+)}
 
       {view === "score" && <CoordinatorScoreView toast={toast} />}
 
@@ -87,41 +93,56 @@ export function CoordinatorShell({
 }
 
 function MembrosView({
+  user,
   openDrawer,
   openModal,
   toast,
 }: {
+  user: Membro;
   openDrawer: (m: Membro) => void;
   openModal: ModalOpener;
   toast: ToastFn;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"todos" | "Pago" | "Pendente" | "Em atraso">("todos");
+
+  const [groups, setGroups] = useState<GroupResponse[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+
   const [membros, setMembros] = useState<Membro[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const [error, setError] = useState("");
 
-  const alreadyLoadedRef = useRef(false);
-  const loadingRef = useRef(false);
+  const loadingGroupsRef = useRef(false);
+  const loadingMembersRef = useRef(false);
+  const groupsLoadedRef = useRef(false);
+  const loadedMembersGroupRef = useRef<string | null>(null);
   const errorShownRef = useRef(false);
 
-  const loadMembers = useCallback(
+  const loadGroups = useCallback(
     async (force = false) => {
-      if (!force && alreadyLoadedRef.current) return;
-      if (loadingRef.current) return;
+      if (!force && groupsLoadedRef.current) return;
+      if (loadingGroupsRef.current) return;
 
-      loadingRef.current = true;
-      setLoading(true);
+      loadingGroupsRef.current = true;
+      setLoadingGroups(true);
       setError("");
 
       try {
-        const response = await getUsersByRole("member", 1, 50);
+        const result = await getCoordinatorGroups(user.id);
 
-        setMembros(response.membros);
-        alreadyLoadedRef.current = true;
+        setGroups(result);
+        groupsLoadedRef.current = true;
         errorShownRef.current = false;
+
+        const firstGroup = result[0];
+
+        if (firstGroup?.id) {
+          setSelectedGroupId((current) => current || firstGroup.id);
+        }
       } catch (err) {
-        const msg = getApiErrorMessage(err, "Erro ao carregar membros");
+        const msg = getApiErrorMessage(err, "Erro ao carregar grupos do coordenador");
 
         setError(msg);
 
@@ -130,16 +151,60 @@ function MembrosView({
           toast("erro", msg);
         }
       } finally {
-        loadingRef.current = false;
-        setLoading(false);
+        loadingGroupsRef.current = false;
+        setLoadingGroups(false);
+      }
+    },
+    [toast, user.id],
+  );
+
+  const loadMembersByGroup = useCallback(
+    async (groupId: string, force = false) => {
+      if (!groupId) return;
+      if (!force && loadedMembersGroupRef.current === groupId) return;
+      if (loadingMembersRef.current) return;
+
+      loadingMembersRef.current = true;
+      setLoadingMembers(true);
+      setError("");
+
+      try {
+        const result = await getGroupMembers(groupId, 1, 50);
+
+        setMembros(result.membros);
+        loadedMembersGroupRef.current = groupId;
+        errorShownRef.current = false;
+      } catch (err) {
+        const msg = getApiErrorMessage(err, "Erro ao carregar membros do grupo");
+
+        setMembros([]);
+        setError(msg);
+
+        if (!errorShownRef.current) {
+          errorShownRef.current = true;
+          toast("erro", msg);
+        }
+      } finally {
+        loadingMembersRef.current = false;
+        setLoadingMembers(false);
       }
     },
     [toast],
   );
 
   useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
+    loadGroups();
+  }, [loadGroups]);
+
+  useEffect(() => {
+    if (!selectedGroupId) return;
+    loadMembersByGroup(selectedGroupId);
+  }, [selectedGroupId, loadMembersByGroup]);
+
+  const selectedGroup = useMemo(
+    () => groups.find((group) => group.id === selectedGroupId) ?? null,
+    [groups, selectedGroupId],
+  );
 
   const filtered = useMemo(
     () =>
@@ -150,6 +215,23 @@ function MembrosView({
       ),
     [search, filter, membros],
   );
+
+  const handleChangeGroup = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    setMembros([]);
+    setSearch("");
+    setFilter("todos");
+  };
+
+  const handleRefresh = () => {
+    if (!selectedGroupId) {
+      loadGroups(true);
+      return;
+    }
+
+    loadedMembersGroupRef.current = null;
+    loadMembersByGroup(selectedGroupId, true);
+  };
 
   return (
     <div>
@@ -163,12 +245,18 @@ function MembrosView({
           marginBottom: 20,
         }}
       >
-        <h1 className="kx-display" style={{ fontSize: 26 }}>
-          {membros.length} membros
-        </h1>
+        <div>
+          <h1 className="kx-display" style={{ fontSize: 26 }}>
+            Membros do grupo
+          </h1>
+
+          <p style={{ color: "var(--ink-3)", fontSize: 14, marginTop: 4 }}>
+            Primeiro selecione o grupo para consultar os membros.
+          </p>
+        </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={() => loadMembers(true)} className="kx-btn kx-btn-outline">
+          <button onClick={handleRefresh} className="kx-btn kx-btn-outline">
             <RefreshCw size={14} /> Actualizar
           </button>
 
@@ -176,6 +264,67 @@ function MembrosView({
             <Plus size={14} /> Adicionar membro
           </button>
         </div>
+      </div>
+
+      <div
+        className="kx-card"
+        style={{
+          padding: 18,
+          marginBottom: 18,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--ink-3)",
+            fontWeight: 700,
+            textTransform: "uppercase",
+          }}
+        >
+          Grupo
+        </div>
+
+        {loadingGroups ? (
+          <div style={{ color: "var(--ink-3)", fontSize: 13 }}>A carregar grupos...</div>
+        ) : groups.length === 0 ? (
+          <div style={{ color: "var(--ink-3)", fontSize: 13 }}>
+            Nenhum grupo encontrado para este coordenador.
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <select
+              className="kx-input"
+              value={selectedGroupId}
+              onChange={(e) => handleChangeGroup(e.target.value)}
+              style={{ maxWidth: 360 }}
+            >
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+
+            {selectedGroup && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span className="kx-pill">
+                  {selectedGroup.currentMembers}/{selectedGroup.maxMembers} membros
+                </span>
+
+                <span className="kx-pill">
+                  Contribuição: {fmtKz(selectedGroup.contributionAmount)}
+                </span>
+
+                <span className="kx-pill">
+                  Fundo: {fmtKz(selectedGroup.guaranteeFund)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div
@@ -205,6 +354,7 @@ function MembrosView({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ paddingLeft: 40 }}
+            disabled={!selectedGroupId || loadingMembers}
           />
         </div>
 
@@ -213,12 +363,14 @@ function MembrosView({
             <button
               key={f}
               onClick={() => setFilter(f)}
+              disabled={!selectedGroupId || loadingMembers}
               className="kx-pill"
               style={{
                 background: filter === f ? "var(--brand)" : "var(--surface-2)",
                 color: filter === f ? "#fff" : "var(--ink-2)",
-                cursor: "pointer",
+                cursor: !selectedGroupId || loadingMembers ? "not-allowed" : "pointer",
                 textTransform: "capitalize",
+                opacity: !selectedGroupId || loadingMembers ? 0.6 : 1,
               }}
             >
               {f}
@@ -227,13 +379,17 @@ function MembrosView({
         </div>
       </div>
 
-      {loading ? (
-        <div className="kx-card" style={{ padding: 20, color: "var(--ink-3)", fontSize: 13 }}>
-          A carregar membros...
-        </div>
-      ) : error ? (
+      {error ? (
         <div className="kx-card" style={{ padding: 20, color: "var(--red)", fontSize: 13 }}>
           {error}
+        </div>
+      ) : !selectedGroupId ? (
+        <div className="kx-card" style={{ padding: 20, color: "var(--ink-3)", fontSize: 13 }}>
+          Selecione um grupo para visualizar os membros.
+        </div>
+      ) : loadingMembers ? (
+        <div className="kx-card" style={{ padding: 20, color: "var(--ink-3)", fontSize: 13 }}>
+          A carregar membros do grupo...
         </div>
       ) : (
         <div className="kx-card" style={{ overflow: "hidden" }}>
@@ -341,7 +497,7 @@ function MembrosView({
                         color: "var(--ink-3)",
                       }}
                     >
-                      Nenhum membro encontrado
+                      Nenhum membro encontrado neste grupo
                     </td>
                   </tr>
                 )}

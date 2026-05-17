@@ -182,7 +182,7 @@ function normalizeRole(role: string): UserRole {
     <>
       {(() => {
         const fallbackMembro: Membro = {
-          id: 1,
+          id: user.userId,
           nome: user.nome,
           tel: "+244 900 000 000",
           posicao: 1,
@@ -202,7 +202,7 @@ function normalizeRole(role: string): UserRole {
         const membro = apiUser
           ? {
               ...fallbackMembro,
-              id: 1,
+              id: apiUser.id,
               nome: apiUser.fullName,
               tel: apiUser.phoneNumber,
               score: apiUser.score,
@@ -212,12 +212,12 @@ function normalizeRole(role: string): UserRole {
         if (user.role === "coordinator") {
           return (
             <CoordinatorShell
-              user={membro}
-              onLogout={handleLogout}
-              openModal={openModal}
-              openDrawer={setDrawerMem}
-              toast={pushToast}
-            />
+  user={membro}
+  onLogout={handleLogout}
+  openModal={openModal}
+  openDrawer={setDrawerMem}
+  toast={pushToast}
+/>
           );
         }
         return (

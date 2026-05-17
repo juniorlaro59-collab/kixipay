@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Plus,
-  Download,
-  Send,
-  Wallet,
-  Users,
-  Clock,
-  Star,
+  Activity,
+  AlertCircle,
+  AlertTriangle,
+  Brain,
   Check,
-  RefreshCw,
   CheckCircle,
-  XCircle,
-  UserPlus,
+  Clock,
+  Download,
   ListChecks,
   PlayCircle,
-  Activity,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Star,
+  Target,
+  UserPlus,
+  Users,
+  Wallet,
+  XCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -25,21 +30,36 @@ import { ROTACAO_MESES } from "@/lib/constants";
 import type { Membro } from "@/components/kixipay/data";
 import type { ToastFn } from "@/components/shared/AppLayout";
 
-import {
-  approveJoinRequest,
-  rejectJoinRequest,
-  getCurrentCycle
-} from "@/services";
-
-
+import { approveJoinRequest, rejectJoinRequest } from "@/services";
 import { getApiErrorMessage } from "@/services/client";
-import { GroupJoinRequest, GroupResponse, getMyGroup, getPendingJoinRequests } from "@/services/groups";
-import { CycleContribution, CycleResponse, getCycleContributions, startNextCycle } from "@/services/cycles";
+
+import {
+  type GroupJoinRequest,
+  type GroupResponse,
+  getCoordinatorGroups,
+  getGroupMembers,
+  getPendingJoinRequests,
+} from "@/services/groups";
+
+import {
+  type CycleContribution,
+  type CycleResponse,
+  getCurrentCycle,
+  getCycleContributions,
+  startNextCycle,
+} from "@/services/cycles";
+
+import { getMyRiskAnalysis, getRiskAnalysisByPhone } from "@/services";
+import type { RiskAnalysisResult } from "@/services";
 
 type ModalOpener = (
   m: "contribuicao" | "addMembro" | "confirmarPagamento" | "recomendacao",
   data?: Membro,
 ) => void;
+
+type RiskAnalysisWithScore = RiskAnalysisResult & {
+  score?: number;
+};
 
 function getInitials(name: string): string {
   return name
@@ -63,6 +83,20 @@ function normalizeContributionStatus(status: string): "Pago" | "Pendente" | "Em 
   return "Pendente";
 }
 
+function getScoreColor(score: number): string {
+  if (score >= 750) return "var(--green)";
+  if (score >= 600) return "var(--blue)";
+  if (score >= 400) return "var(--orange-mid)";
+  return "var(--red)";
+}
+
+function getScoreLabel(score: number): string {
+  if (score >= 800) return "Excelente";
+  if (score >= 600) return "Bom";
+  if (score >= 400) return "Regular";
+  return "A construir";
+}
+
 export function CoordinatorDashboard({
   user,
   openModal,
@@ -74,6 +108,7 @@ export function CoordinatorDashboard({
 }) {
   const [grupo, setGrupo] = useState<GroupResponse | null>(null);
   const [cycle, setCycle] = useState<CycleResponse | null>(null);
+  const [membros, setMembros] = useState<Membro[]>([]);
   const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
   const [contributions, setContributions] = useState<CycleContribution[]>([]);
 
@@ -97,20 +132,23 @@ export function CoordinatorDashboard({
       setError(null);
 
       try {
-        const group = await getMyGroup();
+        const groups = await getCoordinatorGroups(String(user.id));
+        const group = groups[0] ?? null;
 
         setGrupo(group);
 
         if (group?.id) {
           setLoadingCycle(true);
 
-          const [currentCycle, pendingRequests] = await Promise.all([
+          const [currentCycle, pendingRequests, groupMembers] = await Promise.all([
             getCurrentCycle(group.id),
             getPendingJoinRequests(group.id, 1, 10),
+            getGroupMembers(group.id, 1, 50),
           ]);
 
           setCycle(currentCycle);
           setJoinRequests(pendingRequests.items ?? []);
+          setMembros(groupMembers.membros ?? []);
 
           if (currentCycle?.id) {
             const cycleContributions = await getCycleContributions(currentCycle.id, 1, 20);
@@ -122,6 +160,7 @@ export function CoordinatorDashboard({
           setCycle(null);
           setJoinRequests([]);
           setContributions([]);
+          setMembros([]);
         }
 
         alreadyLoadedRef.current = true;
@@ -133,7 +172,7 @@ export function CoordinatorDashboard({
         setLoadingCycle(false);
       }
     },
-    [],
+    [user.id],
   );
 
   useEffect(() => {
@@ -210,7 +249,7 @@ export function CoordinatorDashboard({
   };
 
   const grupoNome = grupo?.name || "Grupo não carregado";
-  const totalMembros = grupo?.currentMembers ?? 0;
+  const totalMembros = membros.length || grupo?.currentMembers || 0;
   const maxMembros = grupo?.maxMembers ?? totalMembros;
 
   const contribRecebidas = cycle?.totalContributions ?? 0;
@@ -221,7 +260,10 @@ export function CoordinatorDashboard({
   const saldoTotal = cycle?.totalCollected ?? grupo?.guaranteeFund ?? 0;
   const beneficiario = cycle?.beneficiaryName || "Sem beneficiário definido";
 
-  const scoreMedio = "—";
+  const scoreMedio =
+    membros.length > 0
+      ? Math.round(membros.reduce((total, membro) => total + membro.score, 0) / membros.length)
+      : 0;
 
   if (loading) {
     return (
@@ -345,12 +387,12 @@ export function CoordinatorDashboard({
         />
 
         <KpiCard
-          cor="var(--gold)"
+          cor={membros.length > 0 ? getScoreColor(scoreMedio) : "var(--gold)"}
           bg="var(--gold-light)"
           Icon={Star}
           label="KixiScore Médio"
-          valor={`${scoreMedio} ★`}
-          sub="Não disponível na resposta do grupo"
+          valor={membros.length > 0 ? `${scoreMedio} ★` : "—"}
+          sub={membros.length > 0 ? getScoreLabel(scoreMedio) : "Sem membros carregados"}
         />
       </div>
 
@@ -376,7 +418,7 @@ export function CoordinatorDashboard({
             onReject={handleRejectJoinRequest}
           />
 
-          <RotacaoCompleta currentPosition={cycle?.cycleNumber ?? 1} />
+          <RotacaoCompleta membros={membros} currentPosition={cycle?.cycleNumber ?? 1} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -652,7 +694,13 @@ function PedidosEntrada({
   );
 }
 
-function RotacaoCompleta({ currentPosition }: { currentPosition: number }) {
+function RotacaoCompleta({
+  membros,
+  currentPosition,
+}: {
+  membros: Membro[];
+  currentPosition: number;
+}) {
   return (
     <div className="kx-card" style={{ padding: 24 }}>
       <div
@@ -667,72 +715,81 @@ function RotacaoCompleta({ currentPosition }: { currentPosition: number }) {
         Rotação do grupo
       </div>
 
-      <div
-        style={{
-          padding: 20,
-          borderRadius: 14,
-          background: "var(--surface-2)",
-          border: "1px solid var(--border-soft)",
-          color: "var(--ink-3)",
-          fontSize: 13,
-        }}
-      >
-        Ciclo actual:{" "}
-        <strong style={{ color: "var(--ink)" }}>
-          {currentPosition}
-        </strong>
-        . A lista completa da rotação depende de uma rota que devolva os membros do grupo.
-      </div>
+      {membros.length === 0 ? (
+        <div
+          style={{
+            padding: 20,
+            borderRadius: 14,
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-soft)",
+            color: "var(--ink-3)",
+            fontSize: 13,
+          }}
+        >
+          Nenhum membro encontrado para este grupo.
+        </div>
+      ) : (
+        <div
+          className="kx-scroll"
+          style={{
+            maxHeight: 320,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          {[...membros]
+            .sort((a, b) => a.posicao - b.posicao)
+            .map((membro) => {
+              const isCurrent = membro.posicao === currentPosition;
+              const isPast = membro.posicao < currentPosition;
 
-      <div
-        className="kx-scroll"
-        style={{
-          maxHeight: 220,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          marginTop: 12,
-        }}
-      >
-        {ROTACAO_MESES.map((mes, index) => {
-          const posicao = index + 1;
-          const isCurrent = posicao === currentPosition;
-          const isPast = posicao < currentPosition;
+              return (
+                <div
+                  key={membro.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    background: isCurrent ? "var(--brand-light)" : "transparent",
+                    color: isCurrent ? "var(--brand)" : "var(--ink)",
+                    fontWeight: isCurrent ? 600 : 400,
+                  }}
+                >
+                  <span
+                    className="kx-num"
+                    style={{
+                      width: 24,
+                      fontSize: 13,
+                      color: isCurrent ? "var(--brand)" : "var(--ink-3)",
+                    }}
+                  >
+                    {membro.posicao}
+                  </span>
 
-          return (
-            <div
-              key={mes}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 12px",
-                borderRadius: 10,
-                background: isCurrent ? "var(--brand-light)" : "transparent",
-                color: isCurrent ? "var(--brand)" : "var(--ink)",
-                fontWeight: isCurrent ? 600 : 400,
-              }}
-            >
-              <span
-                className="kx-num"
-                style={{
-                  width: 24,
-                  fontSize: 13,
-                  color: isCurrent ? "var(--brand)" : "var(--ink-3)",
-                }}
-              >
-                {posicao}
-              </span>
+                  <Avatar iniciais={membro.iniciais} cor={membro.cor} size={28} />
 
-              <span style={{ flex: 1, fontSize: 13 }}>{mes}</span>
+                  <span style={{ flex: 1, fontSize: 13 }}>{membro.nome}</span>
 
-              {isCurrent && <span className="kx-pill">Actual</span>}
-              {isPast && <Check size={14} color="var(--green)" />}
-            </div>
-          );
-        })}
-      </div>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: isCurrent ? "var(--brand)" : "var(--ink-3)",
+                    }}
+                  >
+                    {ROTACAO_MESES[membro.posicao - 1] ?? "-"}
+                  </span>
+
+                  {isCurrent && <span className="kx-pill">Actual</span>}
+                  {isPast && <Check size={14} color="var(--green)" />}
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }
@@ -931,17 +988,6 @@ function AccoesRapidas({
   );
 }
 
-
-import {
-  AlertCircle,
-  AlertTriangle,
-  Brain,
-  Search,
-  Target,
-} from "lucide-react";
-import { getMyRiskAnalysis, getRiskAnalysisByPhone } from "@/services";
-import type { RiskAnalysisResult } from "@/services";
-
 function getRiskColor(riskLevel: string): string {
   const value = riskLevel.toLowerCase();
 
@@ -969,9 +1015,8 @@ function getRiskIcon(riskLevel: string): LucideIcon {
   return AlertCircle;
 }
 
-
 export function CoordinatorScoreView({ toast }: { toast: ToastFn }) {
-  const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysisResult | null>(null);
+  const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysisWithScore | null>(null);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [consultingByPhone, setConsultingByPhone] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -994,7 +1039,7 @@ export function CoordinatorScoreView({ toast }: { toast: ToastFn }) {
     setLoading(true);
 
     try {
-      const data = await getMyRiskAnalysis();
+      const data = (await getMyRiskAnalysis()) as RiskAnalysisWithScore;
 
       setRiskAnalysis(data);
       setConsultingByPhone(false);
@@ -1028,7 +1073,7 @@ export function CoordinatorScoreView({ toast }: { toast: ToastFn }) {
       setLoading(true);
 
       try {
-        const data = await getRiskAnalysisByPhone(phone);
+        const data = (await getRiskAnalysisByPhone(phone)) as RiskAnalysisWithScore;
 
         setRiskAnalysis(data);
         setConsultingByPhone(true);
@@ -1061,8 +1106,8 @@ export function CoordinatorScoreView({ toast }: { toast: ToastFn }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <Skeleton width={360} height={36} />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          {[1, 2, 3].map((i) => (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="kx-card" style={{ padding: 20, height: 120 }}>
               <Skeleton width="80%" height={16} />
               <div style={{ marginTop: 8 }}>
@@ -1084,6 +1129,11 @@ export function CoordinatorScoreView({ toast }: { toast: ToastFn }) {
   const riskColor = riskAnalysis ? getRiskColor(riskAnalysis.riskLevel) : "var(--ink-3)";
   const RiskIcon = riskAnalysis ? getRiskIcon(riskAnalysis.riskLevel) : Brain;
   const riskStatus = riskAnalysis ? getRiskStatus(riskAnalysis.riskLevel) : "Indisponível";
+
+  const score = riskAnalysis?.score ?? 0;
+  const scoreAvailable = riskAnalysis?.score !== undefined;
+  const scoreColor = scoreAvailable ? getScoreColor(score) : "var(--ink-3)";
+  const scoreLabel = scoreAvailable ? getScoreLabel(score) : "Não disponível";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1160,7 +1210,16 @@ export function CoordinatorScoreView({ toast }: { toast: ToastFn }) {
               : "Resultado da análise do utilizador autenticado"}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+            {/* <KpiCard
+              Icon={Star}
+              label="KixiScore"
+              valor={scoreAvailable ? `${score} ★` : "—"}
+              sub={scoreLabel}
+              cor={scoreColor}
+              bg="var(--gold-light)"
+            /> */}
+
             <KpiCard
               Icon={Brain}
               label="Motor de análise"
