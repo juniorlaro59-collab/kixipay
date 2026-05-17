@@ -140,11 +140,11 @@ Senha padrão: **`123456`**
 Editar no `.env`:
 
 ```
-VITE_API_PROXY=https://novo-url.ngrok-free.app
+VITE_API_URL=https://novo-url.ngrok-free.app
 ```
 
 E também em `vite.config.ts` (linha 11):
 
 ```ts
-const API_TARGET = "https://novo-url.ngrok-free.app";
+// Nao ha proxy no Vite; a API e chamada diretamente via VITE_API_URL.
 ```

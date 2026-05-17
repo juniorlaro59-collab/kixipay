@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Modal, Avatar, GeoQR, Logo } from "./shared";
@@ -9,6 +9,14 @@ import { loginSchema, registerSchema } from "@/lib/validations";
 import type { LoginFormData, RegisterFormData } from "@/lib/validations";
 import { login, register } from "@/services";
 import type { LoginResult } from "@/services";
+
+function getFriendlyAuthError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Erro desconhecido";
+  if (/timeout of \d+ms exceeded/i.test(message)) {
+    return "Nao foi possivel contactar o servidor. Verifique a ligacao e tente novamente.";
+  }
+  return message;
+}
 
 export function AuthModal({
   open,
@@ -23,6 +31,7 @@ export function AuthModal({
   const [loading, setLoading] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
+  const authRequestRef = useRef(false);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -35,32 +44,38 @@ export function AuthModal({
   });
 
   const handleLogin = async (data: LoginFormData) => {
+    if (authRequestRef.current) return;
+    authRequestRef.current = true;
     setLoading(true);
     setLoadingMsg("A verificar credenciais...");
     try {
       const result = await login(data.telefone, data.pin);
       onLogin(result);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      const msg = getFriendlyAuthError(err);
       console.error("[LOGIN ERROR]", msg);
       loginForm.setError("root", { message: msg });
     } finally {
+      authRequestRef.current = false;
       setLoading(false);
       setLoadingMsg("");
     }
   };
 
   const handleRegister = async (data: RegisterFormData) => {
+    if (authRequestRef.current) return;
+    authRequestRef.current = true;
     setLoading(true);
     setLoadingMsg("A criar conta...");
     try {
       const result = await register(data.nome, data.telefone, data.pin);
       onLogin(result);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      const msg = getFriendlyAuthError(err);
       console.error("[REGISTER ERROR]", msg);
       registerForm.setError("root", { message: msg });
     } finally {
+      authRequestRef.current = false;
       setLoading(false);
       setLoadingMsg("");
     }

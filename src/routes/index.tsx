@@ -212,7 +212,6 @@ function KixiPayApp() {
         );
       })()}
 
-      <AuthModal open={modal === "auth"} onClose={() => setModal(null)} onLogin={handleLogin} />
       <ContribuicaoModal
         open={modal === "contribuicao"}
         onClose={() => setModal(null)}

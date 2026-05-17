@@ -15,11 +15,20 @@ function normalizePhone(phone: string): string {
 }
 
 export async function login(telefone: string, pin: string): Promise<LoginResult> {
+  console.log("[AUTH] login() chamado");
+  console.log("[AUTH] Telefone normalizado:", normalizePhone(telefone));
+
   const res = await post<ApiLoginResponse>("/api/Auth/login", {
     phoneNumber: normalizePhone(telefone),
     password: pin,
   });
+
+  console.log("[AUTH] Resposta login:", res);
+  console.log("[AUTH] Token recebido:", res.token ? `${res.token.slice(0, 20)}...` : "NULO");
+  console.log("[AUTH] User recebido:", res.user);
+
   setToken(res.token);
+
   return {
     userId: res.user.id,
     nome: res.user.fullName,
@@ -29,12 +38,21 @@ export async function login(telefone: string, pin: string): Promise<LoginResult>
 }
 
 export async function register(nome: string, telefone: string, pin: string): Promise<LoginResult> {
+  console.log("[AUTH] register() chamado");
+  console.log("[AUTH] Nome:", nome, "| Telefone normalizado:", normalizePhone(telefone));
+
   const res = await post<ApiLoginResponse>("/api/Auth/register", {
     fullName: nome,
     phoneNumber: normalizePhone(telefone),
     password: pin,
   });
+
+  console.log("[AUTH] Resposta register:", res);
+  console.log("[AUTH] Token recebido:", res.token ? `${res.token.slice(0, 20)}...` : "NULO");
+  console.log("[AUTH] User recebido:", res.user);
+
   setToken(res.token);
+
   return {
     userId: res.user.id,
     nome: res.user.fullName,
